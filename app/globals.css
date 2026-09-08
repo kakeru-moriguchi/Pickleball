@@ -13,21 +13,21 @@
   --color-muted: var(--muted); --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent); --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive); --color-border: var(--border); --color-input: var(--input); --color-ring: var(--ring);
-  --font-sans: var(--font-noto);
+  --font-sans: "Noto Sans JP", "Hiragino Sans", "Yu Gothic UI", "Yu Gothic", sans-serif;
   --radius-sm: calc(var(--radius) * .6); --radius-md: calc(var(--radius) * .8); --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) * 1.4); --radius-2xl: calc(var(--radius) * 1.8); --radius-3xl: calc(var(--radius) * 2.2);
 }
 
 :root {
-  --background: oklch(.985 .012 350); --foreground: oklch(.22 .025 350);
+  --background: oklch(.982 .006 70); --foreground: oklch(.24 .012 25);
   --card: oklch(1 0 0); --card-foreground: var(--foreground);
   --popover: oklch(1 0 0); --popover-foreground: var(--foreground);
-  --primary: oklch(.56 .205 350); --primary-foreground: oklch(1 0 0);
-  --secondary: oklch(.955 .035 350); --secondary-foreground: oklch(.42 .12 350);
-  --muted: oklch(.955 .018 350); --muted-foreground: oklch(.5 .035 350);
-  --accent: oklch(.91 .07 350); --accent-foreground: oklch(.4 .13 350);
-  --destructive: oklch(.58 .22 25); --border: oklch(.9 .025 350); --input: oklch(.89 .03 350); --ring: oklch(.62 .18 350);
-  --radius: .85rem;
+  --primary: oklch(.62 .155 18); --primary-foreground: oklch(1 0 0);
+  --secondary: oklch(.955 .018 25); --secondary-foreground: oklch(.39 .075 18);
+  --muted: oklch(.955 .007 70); --muted-foreground: oklch(.5 .015 25);
+  --accent: oklch(.925 .045 20); --accent-foreground: oklch(.4 .1 18);
+  --destructive: oklch(.58 .22 25); --border: oklch(.9 .008 45); --input: oklch(.89 .01 45); --ring: oklch(.65 .12 18);
+  --radius: .65rem;
 }
 
 .dark {
@@ -43,5 +43,6 @@
 
 @layer base { * { @apply border-border outline-ring/50; } html { @apply font-sans; } body { @apply bg-background text-foreground; } }
 
-body { min-height: 100vh; background-image: radial-gradient(circle at 8% 2%, rgb(252 231 243 / .85), transparent 28rem); }
+body { min-height: 100vh; background: #fbfaf8; }
 button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
+::selection { background: #f7cdd0; color: #3f292b; }

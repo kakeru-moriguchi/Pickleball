@@ -1,8 +1,7 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
-import { Sparkles } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +10,12 @@ export default function LoginPage() {
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).has("error")) {
+      setMessage("ログインを完了できませんでした。もう一度お試しください。");
+    }
+  }, []);
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setLoading(true);
@@ -30,18 +35,27 @@ export default function LoginPage() {
     setLoading(false);
   }
   async function google() {
-    const supabase = createClient();
-    await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: { redirectTo: `${window.location.origin}/auth/callback?next=/` },
-    });
+    setGoogleLoading(true);
+    setMessage("");
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo: `${window.location.origin}/auth/callback`, skipBrowserRedirect: true },
+      });
+      if (error || !data.url) throw error ?? new Error("Missing authorization URL");
+      window.location.assign(data.url);
+    } catch {
+      setMessage("Googleログインを開始できませんでした。時間をおいてもう一度お試しください。");
+      setGoogleLoading(false);
+    }
   }
   return (
-    <main className="grid min-h-screen place-items-center px-4">
-      <section className="w-full max-w-md rounded-[2rem] border border-pink-100 bg-white p-7 shadow-xl shadow-pink-100/60">
+    <main className="grid min-h-screen place-items-center bg-[#fbfaf8] px-4 py-8">
+      <section className="w-full max-w-md rounded-xl border border-zinc-200 bg-white p-6 md:p-8">
         <Link href="/" className="flex items-center gap-2 font-black">
-          <span className="grid size-10 place-items-center rounded-2xl bg-primary text-white">
-            <Sparkles className="size-5" />
+          <span className="grid size-9 place-items-center rounded-lg bg-primary text-xs text-white">
+            PL
           </span>
           Pickle Link
         </Link>
@@ -51,9 +65,11 @@ export default function LoginPage() {
         <p className="mt-2 text-sm text-muted-foreground">
           投稿や参加予定をあなたのアカウントに保存します。
         </p>
-        <Button onClick={google} variant="outline" className="mt-6 h-11 w-full rounded-xl">
-          Googleで続ける
+        <Button onClick={google} disabled={loading || googleLoading} variant="outline" className="mt-6 h-11 w-full rounded-lg border-zinc-300">
+          {googleLoading ? "Googleへ移動しています…" : "Googleアカウントで続ける"}
         </Button>
+        <p className="mt-2 text-xs leading-5 text-muted-foreground">はじめての方はアカウントが作成され、登録済みの方はログインできます。</p>
+        {message && <p role="alert" className="mt-4 rounded-lg bg-pink-50 p-3 text-sm text-zinc-700">{message}</p>}
         <div className="my-5 flex items-center gap-3 text-xs text-muted-foreground">
           <span className="h-px flex-1 bg-border" />
           または
@@ -62,7 +78,7 @@ export default function LoginPage() {
         <form onSubmit={submit} className="space-y-4">
           <label className="block">
             <span className="mb-2 block text-sm font-bold">メールアドレス</span>
-            <Input name="email" type="email" required className="h-11 rounded-xl" />
+            <Input name="email" type="email" required className="h-11 rounded-lg" />
           </label>
           <label className="block">
             <span className="mb-2 block text-sm font-bold">パスワード</span>
@@ -71,11 +87,10 @@ export default function LoginPage() {
               type="password"
               required
               minLength={8}
-              className="h-11 rounded-xl"
+              className="h-11 rounded-lg"
             />
           </label>
-          {message && <p className="rounded-xl bg-pink-50 p-3 text-sm text-zinc-700">{message}</p>}
-          <Button disabled={loading} className="h-11 w-full rounded-xl font-bold">
+          <Button disabled={loading || googleLoading} className="h-11 w-full rounded-lg font-bold">
             {loading ? "処理中…" : mode === "login" ? "ログイン" : "登録する"}
           </Button>
         </form>
@@ -88,6 +103,10 @@ export default function LoginPage() {
         >
           {mode === "login" ? "はじめての方はこちら" : "すでにアカウントをお持ちの方"}
         </button>
+        <p className="mt-6 text-center text-xs leading-5 text-muted-foreground">
+          続行すると、<Link href="/terms" className="underline">利用規約</Link>と
+          <Link href="/privacy" className="underline">プライバシーポリシー</Link>に同意したものとみなします。
+        </p>
       </section>
     </main>
   );
