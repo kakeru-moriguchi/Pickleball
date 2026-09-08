@@ -34,16 +34,17 @@ import { developmentSamplePosts, type CommunityPost } from "@/lib/community-post
 type PostType = "practice" | "member" | "event";
 type Screen = "home" | PostType | "create" | "mypage" | "admin";
 type Post = CommunityPost;
+type UserProfile = {
+  id: string;
+  email: string;
+  display_name: string;
+  prefecture: string;
+  level: string;
+  role: string;
+};
 type Me = {
   signedIn: boolean;
-  user?: {
-    id: string;
-    email: string;
-    display_name: string;
-    prefecture: string;
-    level: string;
-    role: string;
-  };
+  user?: UserProfile;
 };
 
 declare global {
@@ -415,6 +416,7 @@ export function PickleApp() {
             onEdit={openEdit}
             onManage={manage}
             onAdmin={() => go("admin")}
+            onProfileSaved={(user) => setMe({ signedIn: true, user })}
           />
         )}
         {screen === "admin" && (
@@ -1197,16 +1199,18 @@ function SelectField({
   name,
   options,
   defaultValue,
+  required = true,
 }: {
   label: string;
   name: string;
   options: string[];
   defaultValue?: string | number;
+  required?: boolean;
 }) {
   return (
     <label className="block">
       <span className="mb-2 block text-sm font-bold">{label}</span>
-      <NativeSelect name={name} required className="w-full" defaultValue={defaultValue}>
+      <NativeSelect name={name} required={required} className="w-full" defaultValue={defaultValue}>
         <NativeSelectOption value="">選択してください</NativeSelectOption>
         {options.map((x) => (
           <NativeSelectOption key={x}>{x}</NativeSelectOption>
@@ -1224,6 +1228,7 @@ function MyPage({
   onEdit,
   onManage,
   onAdmin,
+  onProfileSaved,
 }: {
   me: Me;
   mine: Post[];
@@ -1232,6 +1237,7 @@ function MyPage({
   onEdit: (p: Post) => void;
   onManage: (p: Post, a: "close" | "delete") => void;
   onAdmin: () => void;
+  onProfileSaved: (user: UserProfile) => void;
 }) {
   if (!me.signedIn)
     return (
@@ -1264,7 +1270,7 @@ function MyPage({
           </div>
         </div>
         <div className="mt-5 flex flex-wrap gap-2">
-          <ProfileEditor me={me} />
+          <ProfileEditor me={me} onSaved={onProfileSaved} />
           {me.user?.role === "admin" && (
             <Button onClick={onAdmin} variant="secondary" className="rounded-full">
               管理者画面
@@ -1326,23 +1332,27 @@ function MyPage({
   );
 }
 
-function ProfileEditor({ me }: { me: Me }) {
+function ProfileEditor({ me, onSaved }: { me: Me; onSaved: (user: UserProfile) => void }) {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSaving(true);
+    setError("");
     const body = Object.fromEntries(new FormData(event.currentTarget));
     try {
-      await readJson(
+      const data = await readJson(
         await fetch("/api/profile", {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
         }),
       );
+      onSaved(data.user as UserProfile);
       setOpen(false);
-      window.location.reload();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "プロフィールを保存できませんでした");
     } finally {
       setSaving(false);
     }
@@ -1364,14 +1374,21 @@ function ProfileEditor({ me }: { me: Me }) {
             name="prefecture"
             options={prefectures}
             defaultValue={me.user?.prefecture}
+            required={false}
           />
           <SelectField
             label="レベル"
             name="level"
             options={levelOptions}
             defaultValue={me.user?.level}
+            required={false}
           />
-          <Button disabled={saving} className="h-11 w-full">
+          {error && (
+            <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-700">
+              {error}
+            </p>
+          )}
+          <Button type="submit" disabled={saving} className="h-11 w-full">
             {saving ? "保存中…" : "保存する"}
           </Button>
         </form>
