@@ -4,13 +4,13 @@ export default function PrivacyPage() {
   return (
     <main className="min-h-screen bg-[#fbfaf8] px-4 py-10 text-zinc-800">
       <article className="mx-auto max-w-2xl rounded-xl border border-zinc-200 bg-white p-6 md:p-10">
-        <Link href="/" className="text-sm font-bold text-primary">← Pickle Linkへ戻る</Link>
+        <Link href="/" className="text-sm font-bold text-primary">← みんなでピックル！！へ戻る</Link>
         <h1 className="mt-6 text-2xl font-black">プライバシーポリシー</h1>
         <p className="mt-2 text-sm text-zinc-500">制定日：2026年9月8日</p>
         <div className="mt-8 space-y-7 text-sm leading-7">
           <section>
             <h2 className="text-base font-bold">取得する情報</h2>
-            <p className="mt-2">Pickle Linkは、アカウント登録時のメールアドレス、表示名、都道府県、競技レベル、ユーザーが投稿した募集内容および参加情報を取得します。Googleログインを利用した場合は、Googleから提供される氏名、メールアドレスなどの基本プロフィール情報を取得します。</p>
+            <p className="mt-2">みんなでピックル！！は、アカウント登録時のメールアドレス、表示名、都道府県、競技レベル、ユーザーが投稿した募集内容および参加情報を取得します。Googleログインを利用した場合は、Googleから提供される氏名、メールアドレスなどの基本プロフィール情報を取得します。</p>
           </section>
           <section>
             <h2 className="text-base font-bold">利用目的</h2>

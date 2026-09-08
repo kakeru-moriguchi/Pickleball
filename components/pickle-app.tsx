@@ -327,13 +327,10 @@ export function PickleApp() {
         <div className="mx-auto flex h-16 max-w-5xl items-center justify-between gap-6">
           <button
             onClick={() => go("home")}
-            className="flex shrink-0 items-center gap-2.5"
+            className="shrink-0"
             aria-label="ホームへ"
           >
-            <span className="grid size-9 place-items-center rounded-lg bg-primary text-sm font-black text-white">
-              PL
-            </span>
-            <span className="text-lg font-extrabold tracking-tight">Pickle Link</span>
+            <span className="text-lg font-extrabold tracking-tight">みんなでピックル！！</span>
           </button>
           <div className="hidden flex-1 items-center justify-center gap-1 md:flex">
             {nav.map(({ screen: target, label }) => (
