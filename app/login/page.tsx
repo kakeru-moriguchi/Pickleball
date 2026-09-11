@@ -87,7 +87,7 @@ export default function LoginPage() {
               className="h-11 rounded-lg"
             />
           </label>
-          <Button disabled={loading || googleLoading} className="h-11 w-full rounded-lg font-bold">
+          <Button type="submit" disabled={loading || googleLoading} className="h-11 w-full rounded-lg font-bold">
             {loading ? "処理中…" : mode === "login" ? "ログイン" : "登録する"}
           </Button>
         </form>

@@ -472,7 +472,7 @@ function SearchBox({
         className="h-10 border-0 bg-transparent text-zinc-900 shadow-none focus-visible:ring-0"
         placeholder="場所・大会名・キーワード"
       />
-      <Button className="h-9 rounded-lg px-4">探す</Button>
+      <Button type="submit" className="h-9 rounded-lg px-4">探す</Button>
     </form>
   );
 }
@@ -1155,7 +1155,7 @@ function CreateScreen({
             )}
           </p>
         )}
-        <Button disabled={saving} className="h-12 w-full rounded-lg text-base font-bold">
+        <Button type="submit" disabled={saving} className="h-12 w-full rounded-lg text-base font-bold">
           {saving ? "保存中…" : initial ? "変更を保存" : "この内容で投稿する"}
         </Button>
       </form>
