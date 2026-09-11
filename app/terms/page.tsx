@@ -6,7 +6,7 @@ export default function TermsPage() {
       <article className="mx-auto max-w-2xl rounded-xl border border-zinc-200 bg-white p-6 md:p-10">
         <Link href="/" className="text-sm font-bold text-primary">← みんなでピックル！！へ戻る</Link>
         <h1 className="mt-6 text-2xl font-black">利用規約</h1>
-        <p className="mt-2 text-sm text-zinc-500">制定日：2026年9月8日</p>
+        <p className="mt-2 text-sm text-zinc-500">制定日：2026年9月8日／改定日：2026年9月12日</p>
         <div className="mt-8 space-y-7 text-sm leading-7">
           <section>
             <h2 className="text-base font-bold">サービスについて</h2>
@@ -18,7 +18,7 @@ export default function TermsPage() {
           </section>
           <section>
             <h2 className="text-base font-bold">投稿と参加</h2>
-            <p className="mt-2">投稿者は募集内容、日時、場所、参加費などを正確に記載してください。参加者と主催者の間で発生する連絡、費用の支払い、事故やトラブルについては、当事者間で解決するものとします。</p>
+            <p className="mt-2">投稿者は募集内容、日時、場所、参加費などを正確に記載してください。応募は主催者の承認によって参加確定となります。応募者が入力した連絡先は、応募先の主催者が募集に関する連絡のためにのみ使用してください。参加者と主催者の間で発生する連絡、費用の支払い、事故やトラブルについては、当事者間で解決するものとします。</p>
           </section>
           <section>
             <h2 className="text-base font-bold">禁止事項</h2>

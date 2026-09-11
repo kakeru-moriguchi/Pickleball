@@ -5,8 +5,15 @@ import { getGuestId } from "@/lib/guest";
 
 type Raw = Record<string, unknown>;
 
-function mapPost(type: PostType, row: Raw, counts: Record<string, number>, joined: Set<string>) {
+function mapPost(
+  type: PostType,
+  row: Raw,
+  counts: Record<string, number>,
+  participations: Map<string, string>,
+  pendingCounts: Record<string, number>,
+) {
   const id = String(row.id);
+  const viewerStatus = participations.get(`${type}:${id}`) ?? "";
   return {
     type,
     id,
@@ -34,7 +41,9 @@ function mapPost(type: PostType, row: Raw, counts: Record<string, number>, joine
     secondary_title: type === "member" ? row.tournament_name : "",
     deadline: type === "member" ? row.deadline : "",
     application_method: type === "event" ? row.application_method : "",
-    viewer_joined: joined.has(`${type}:${id}`) ? 1 : 0,
+    viewer_joined: viewerStatus && viewerStatus !== "rejected" ? 1 : 0,
+    viewer_status: viewerStatus,
+    pending_count: pendingCounts[`${type}:${id}`] ?? 0,
   };
 }
 
@@ -50,6 +59,9 @@ export async function GET(request: NextRequest) {
       supabase.from("event_posts").select("*").order("held_on").limit(100),
       supabase.rpc("get_post_participation_counts"),
       supabase.rpc("get_my_participations", { p_guest_id: getGuestId(request) }),
+      user
+        ? supabase.rpc("get_pending_application_counts")
+        : Promise.resolve({ data: [], error: null }),
     ]);
     const firstError = queries.find((result) => result.error)?.error;
     if (firstError) throw firstError;
@@ -57,13 +69,18 @@ export async function GET(request: NextRequest) {
     (queries[3].data ?? []).forEach((row: Raw) => {
       countMap[`${row.post_type}:${row.post_id}`] = Number(row.participant_count);
     });
-    const joined = new Set<string>(
-      ((queries[4].data ?? []) as Raw[]).map((row) => `${row.post_type}:${row.post_id}`),
+    const participations = new Map<string, string>();
+    ((queries[4].data ?? []) as Raw[]).forEach((row) =>
+      participations.set(`${row.post_type}:${row.post_id}`, String(row.participation_status)),
     );
+    const pendingCounts: Record<string, number> = {};
+    ((queries[5].data ?? []) as Raw[]).forEach((row) => {
+      pendingCounts[`${row.post_type}:${row.post_id}`] = Number(row.pending_count);
+    });
     let posts = [
-      ...(queries[0].data ?? []).map((row) => mapPost("practice", row, countMap, joined)),
-      ...(queries[1].data ?? []).map((row) => mapPost("member", row, countMap, joined)),
-      ...(queries[2].data ?? []).map((row) => mapPost("event", row, countMap, joined)),
+      ...(queries[0].data ?? []).map((row) => mapPost("practice", row, countMap, participations, pendingCounts)),
+      ...(queries[1].data ?? []).map((row) => mapPost("member", row, countMap, participations, pendingCounts)),
+      ...(queries[2].data ?? []).map((row) => mapPost("event", row, countMap, participations, pendingCounts)),
     ];
     const p = request.nextUrl.searchParams;
     const type = normalizeType(p.get("type"));

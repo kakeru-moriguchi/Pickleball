@@ -11,6 +11,7 @@ export default function LoginPage() {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [accepted, setAccepted] = useState(false);
   useEffect(() => {
     if (new URLSearchParams(window.location.search).has("error")) {
       setMessage("ログインを完了できませんでした。もう一度お試しください。");
@@ -18,6 +19,10 @@ export default function LoginPage() {
   }, []);
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!accepted) {
+      setMessage("利用規約とプライバシーポリシーへの同意が必要です。");
+      return;
+    }
     setLoading(true);
     setMessage("");
     const data = new FormData(event.currentTarget);
@@ -35,6 +40,10 @@ export default function LoginPage() {
     setLoading(false);
   }
   async function google() {
+    if (!accepted) {
+      setMessage("利用規約とプライバシーポリシーへの同意が必要です。");
+      return;
+    }
     setGoogleLoading(true);
     setMessage("");
     try {
@@ -62,7 +71,19 @@ export default function LoginPage() {
         <p className="mt-2 text-sm text-muted-foreground">
           投稿や参加予定をあなたのアカウントに保存します。
         </p>
-        <Button onClick={google} disabled={loading || googleLoading} variant="outline" className="mt-6 h-11 w-full rounded-lg border-zinc-300">
+        <label className="mt-6 flex items-start gap-3 rounded-lg bg-zinc-50 p-3 text-xs leading-5 text-zinc-600">
+          <input
+            type="checkbox"
+            checked={accepted}
+            onChange={(event) => setAccepted(event.target.checked)}
+            className="mt-0.5 size-4 accent-pink-600"
+          />
+          <span>
+            <Link href="/terms" className="underline">利用規約</Link>と
+            <Link href="/privacy" className="underline">プライバシーポリシー</Link>に同意します。
+          </span>
+        </label>
+        <Button onClick={google} disabled={loading || googleLoading || !accepted} variant="outline" className="mt-4 h-11 w-full rounded-lg border-zinc-300">
           {googleLoading ? "Googleへ移動しています…" : "Googleアカウントで続ける"}
         </Button>
         <p className="mt-2 text-xs leading-5 text-muted-foreground">はじめての方はアカウントが作成され、登録済みの方はログインできます。</p>
@@ -87,7 +108,7 @@ export default function LoginPage() {
               className="h-11 rounded-lg"
             />
           </label>
-          <Button type="submit" disabled={loading || googleLoading} className="h-11 w-full rounded-lg font-bold">
+          <Button type="submit" disabled={loading || googleLoading || !accepted} className="h-11 w-full rounded-lg font-bold">
             {loading ? "処理中…" : mode === "login" ? "ログイン" : "登録する"}
           </Button>
         </form>
@@ -100,10 +121,6 @@ export default function LoginPage() {
         >
           {mode === "login" ? "はじめての方はこちら" : "すでにアカウントをお持ちの方"}
         </button>
-        <p className="mt-6 text-center text-xs leading-5 text-muted-foreground">
-          続行すると、<Link href="/terms" className="underline">利用規約</Link>と
-          <Link href="/privacy" className="underline">プライバシーポリシー</Link>に同意したものとみなします。
-        </p>
       </section>
     </main>
   );

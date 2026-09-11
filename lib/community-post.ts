@@ -20,6 +20,8 @@ export type CommunityPost = {
   deadline: string;
   application_method: string;
   viewer_joined: number;
+  viewer_status?: "pending" | "approved" | "rejected" | "";
+  pending_count?: number;
   created_at: string;
   is_demo?: boolean;
 };

@@ -12,6 +12,8 @@ type ApplicationBody = {
   hasPaddle?: unknown;
   hasNet?: unknown;
   hasBall?: unknown;
+  contactMethod?: unknown;
+  contactValue?: unknown;
 };
 
 type ApplicantRow = {
@@ -22,6 +24,9 @@ type ApplicantRow = {
   has_paddle: boolean;
   has_net: boolean;
   has_ball: boolean;
+  contact_method: string;
+  contact_value: string;
+  application_status: "pending" | "approved" | "rejected";
   created_at: string;
 };
 
@@ -36,12 +41,16 @@ export async function POST(request: NextRequest) {
   const applicantName = typeof body.applicantName === "string" ? body.applicantName.trim() : "";
   const level = typeof body.level === "string" ? body.level : "";
   const partySize = Number(body.partySize);
+  const contactMethod = typeof body.contactMethod === "string" ? body.contactMethod : "";
+  const contactValue = typeof body.contactValue === "string" ? body.contactValue.trim() : "";
   if (!type || !postId)
     return NextResponse.json({ error: "対象が正しくありません" }, { status: 400 });
   if (!applicantName || applicantName.length > 80)
     return NextResponse.json({ error: "名前を80文字以内で入力してください" }, { status: 400 });
   if (!Number.isInteger(partySize) || partySize < 1 || partySize > 50)
     return NextResponse.json({ error: "参加人数が正しくありません" }, { status: 400 });
+  if (!contactValue || contactValue.length > 200)
+    return NextResponse.json({ error: "連絡先を200文字以内で入力してください" }, { status: 400 });
 
   const currentGuestId = getGuestId(request);
   const guestId = currentGuestId ?? crypto.randomUUID();
@@ -54,6 +63,8 @@ export async function POST(request: NextRequest) {
     p_has_paddle: body.hasPaddle === true,
     p_has_net: body.hasNet === true,
     p_has_ball: body.hasBall === true,
+    p_contact_method: contactMethod,
+    p_contact_value: contactValue,
     p_guest_id: guestId,
   });
   if (error) return NextResponse.json({ error: error.message }, { status: 409 });
@@ -107,7 +118,29 @@ export async function GET(request: NextRequest) {
       hasPaddle: row.has_paddle,
       hasNet: row.has_net,
       hasBall: row.has_ball,
+      contactMethod: row.contact_method,
+      contactValue: row.contact_value,
+      status: row.application_status,
       created_at: row.created_at,
     })),
   });
+}
+
+export async function PATCH(request: NextRequest) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "ログインが必要です" }, { status: 401 });
+  const body = (await request.json()) as { participationId?: unknown; status?: unknown };
+  const participationId = typeof body.participationId === "string" ? body.participationId : "";
+  const status = body.status === "approved" || body.status === "rejected" ? body.status : "";
+  if (!participationId || !status)
+    return NextResponse.json({ error: "承認内容が正しくありません" }, { status: 400 });
+  const { error } = await supabase.rpc("review_participation", {
+    p_participation_id: participationId,
+    p_status: status,
+  });
+  if (error) return NextResponse.json({ error: error.message }, { status: 409 });
+  return NextResponse.json({ ok: true });
 }

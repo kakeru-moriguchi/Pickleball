@@ -49,10 +49,13 @@ type ParticipationApplication = {
   hasPaddle: boolean;
   hasNet: boolean;
   hasBall: boolean;
+  contactMethod: string;
+  contactValue: string;
 };
 type Applicant = ParticipationApplication & {
   id: string;
   created_at: string;
+  status: "pending" | "approved" | "rejected";
 };
 type Me = {
   signedIn: boolean;
@@ -140,6 +143,7 @@ export function PickleApp() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [selected, setSelected] = useState<Post | null>(null);
   const [applying, setApplying] = useState<Post | null>(null);
+  const [reporting, setReporting] = useState<Post | null>(null);
   const [createType, setCreateType] = useState<PostType | null>(null);
   const [editing, setEditing] = useState<Post | null>(null);
   const [q, setQ] = useState("");
@@ -485,6 +489,10 @@ export function PickleApp() {
             setApplying(post);
           }
         }}
+        onReport={(post) => {
+          setSelected(null);
+          setReporting(post);
+        }}
       />
       <ApplicationDialog
         post={applying}
@@ -492,6 +500,21 @@ export function PickleApp() {
         onClose={() => setApplying(null)}
         onApply={applyForPost}
       />
+      <ReportDialog
+        post={reporting}
+        onClose={() => setReporting(null)}
+        onSent={() => {
+          setReporting(null);
+          setNotice("通報を受け付けました。管理者が確認します");
+        }}
+      />
+      <footer className="mx-auto mt-10 max-w-5xl border-t border-zinc-200 px-4 py-8 text-center text-xs text-zinc-500 md:px-8">
+        <div className="flex justify-center gap-5">
+          <a href="/contact" className="hover:text-primary">お問い合わせ</a>
+          <a href="/terms" className="hover:text-primary">利用規約</a>
+          <a href="/privacy" className="hover:text-primary">プライバシーポリシー</a>
+        </div>
+      </footer>
     </div>
   );
 }
@@ -862,10 +885,12 @@ function DetailDialog({
   post,
   onClose,
   onParticipate,
+  onReport,
 }: {
   post: Post | null;
   onClose: () => void;
   onParticipate: (p: Post) => void;
+  onReport: (p: Post) => void;
 }) {
   if (!post) return null;
   const full = post.status === "closed" || post.participant_count >= post.capacity;
@@ -879,6 +904,11 @@ function DetailDialog({
           <div className="mb-2 flex gap-2">
             <Badge>{labels[post.type]}</Badge>
             <Badge variant="secondary">{post.category || post.level}</Badge>
+            {post.viewer_status && post.viewer_status !== "rejected" && (
+              <Badge variant={post.viewer_status === "approved" ? "default" : "secondary"}>
+                {post.viewer_status === "approved" ? "参加確定" : "承認待ち"}
+              </Badge>
+            )}
           </div>
           <DialogTitle className="text-xl font-black leading-snug">{post.title}</DialogTitle>
           <DialogDescription>
@@ -917,7 +947,12 @@ function DetailDialog({
             <p className="mt-1 text-sm text-zinc-600">{post.application_method}</p>
           </div>
         )}
-        <p className="text-sm text-zinc-500">主催：{post.organizer}</p>
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-sm text-zinc-500">主催：{post.organizer}</p>
+          <button onClick={() => onReport(post)} className="text-xs text-zinc-400 underline hover:text-red-600">
+            この投稿を通報
+          </button>
+        </div>
         {post.is_demo && (
           <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">開発環境だけに表示されるサンプル募集です。</p>
         )}
@@ -934,6 +969,66 @@ function DetailDialog({
             {post.is_demo ? "開発用サンプル" : full && !post.viewer_joined ? "満員" : action}
           </Button>
         </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ReportDialog({
+  post,
+  onClose,
+  onSent,
+}: {
+  post: Post | null;
+  onClose: () => void;
+  onSent: () => void;
+}) {
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  if (!post) return null;
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!post) return;
+    const body = Object.fromEntries(new FormData(event.currentTarget));
+    setSaving(true);
+    setError("");
+    try {
+      await readJson(await fetch("/api/reports", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...body, type: post.type, postId: post.id }),
+      }));
+      onSent();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "通報を送信できませんでした");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Dialog open={!!post} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="rounded-xl sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>この投稿を通報</DialogTitle>
+          <DialogDescription>管理者だけが確認します。投稿者には通報者の情報を表示しません。</DialogDescription>
+        </DialogHeader>
+        <form onSubmit={submit} className="space-y-4">
+          <SelectField
+            label="通報理由"
+            name="reason"
+            options={["不適切な内容", "迷惑行為・勧誘", "虚偽・誤解を招く内容", "その他"]}
+          />
+          <label className="block">
+            <span className="mb-2 block text-sm font-bold">詳細（任意）</span>
+            <Textarea name="details" maxLength={1000} rows={4} className="rounded-lg" />
+          </label>
+          {error && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
+          <Button type="submit" disabled={saving} variant="destructive" className="h-11 w-full">
+            {saving ? "送信中…" : "通報を送信"}
+          </Button>
+        </form>
       </DialogContent>
     </Dialog>
   );
@@ -969,6 +1064,8 @@ function ApplicationDialog({
         hasPaddle: form.get("hasPaddle") === "true",
         hasNet: form.get("hasNet") === "true",
         hasBall: form.get("hasBall") === "true",
+        contactMethod: String(form.get("contactMethod") ?? ""),
+        contactValue: String(form.get("contactValue") ?? ""),
       });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "応募できませんでした");
@@ -1027,6 +1124,21 @@ function ApplicationDialog({
               </label>
             ))}
           </div>
+          <div className="grid gap-4 sm:grid-cols-[9rem_1fr]">
+            <SelectField
+              label="連絡方法"
+              name="contactMethod"
+              options={["メール", "LINE", "Instagram", "電話", "その他"]}
+            />
+            <Field
+              label="連絡先"
+              name="contactValue"
+              placeholder="メールアドレス、LINE IDなど"
+            />
+          </div>
+          <p className="rounded-lg bg-zinc-50 px-3 py-2 text-xs leading-5 text-zinc-600">
+            連絡先はこの募集の主催者と管理者だけに表示されます。
+          </p>
           {error && (
             <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-700">
               {error}
@@ -1444,6 +1556,11 @@ function MyPage({
                 <div className="mt-3 flex flex-wrap gap-2 border-t pt-3">
                   <Button onClick={() => setApplicantsPost(post)} variant="outline" size="sm">
                     応募者を見る
+                    {!!post.pending_count && (
+                      <span className="ml-1 rounded-full bg-primary px-1.5 py-0.5 text-[10px] text-white">
+                        {post.pending_count}
+                      </span>
+                    )}
                   </Button>
                   <Button onClick={() => onEdit(post)} variant="outline" size="sm">
                     編集
@@ -1467,7 +1584,12 @@ function MyPage({
         {joined.length ? (
           <div className="grid gap-3 md:grid-cols-2">
             {joined.map((p) => (
-              <PostCard key={p.id} post={p} onOpen={onOpen} />
+              <div key={p.id} className="relative">
+                <span className="absolute right-3 top-3 z-10 rounded-full bg-white px-2 py-1 text-[10px] font-bold text-primary shadow-sm">
+                  {p.viewer_status === "approved" ? "参加確定" : "承認待ち"}
+                </span>
+                <PostCard post={p} onOpen={onOpen} />
+              </div>
             ))}
           </div>
         ) : (
@@ -1483,6 +1605,26 @@ function ApplicantsDialog({ post, onClose }: { post: Post | null; onClose: () =>
   const [applicants, setApplicants] = useState<Applicant[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  async function review(participationId: string, status: "approved" | "rejected") {
+    setError("");
+    try {
+      await readJson(
+        await fetch("/api/participations", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ participationId, status }),
+        }),
+      );
+      setApplicants((current) =>
+        current.map((applicant) =>
+          applicant.id === participationId ? { ...applicant, status } : applicant,
+        ),
+      );
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "承認状態を更新できませんでした");
+    }
+  }
 
   useEffect(() => {
     if (!post) return;
@@ -1512,7 +1654,12 @@ function ApplicantsDialog({ post, onClose }: { post: Post | null; onClose: () =>
               <article key={applicant.id} className="rounded-lg border border-zinc-200 p-4">
                 <div className="flex items-center justify-between gap-3">
                   <h3 className="font-black">{applicant.applicantName}</h3>
-                  <Badge variant="secondary">{applicant.partySize}名</Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary">{applicant.partySize}名</Badge>
+                    <Badge variant={applicant.status === "approved" ? "default" : "secondary"}>
+                      {applicant.status === "pending" ? "未承認" : applicant.status === "approved" ? "承認済み" : "お断り"}
+                    </Badge>
+                  </div>
                 </div>
                 <p className="mt-1 text-sm text-zinc-600">{applicant.level}</p>
                 <div className="mt-3 flex flex-wrap gap-2 text-xs text-zinc-600">
@@ -1520,6 +1667,16 @@ function ApplicantsDialog({ post, onClose }: { post: Post | null; onClose: () =>
                   <span>ネット：{applicant.hasNet ? "あり" : "なし"}</span>
                   <span>ボール：{applicant.hasBall ? "あり" : "なし"}</span>
                 </div>
+                <p className="mt-3 rounded-md bg-zinc-50 px-3 py-2 text-sm">
+                  <span className="font-bold">{applicant.contactMethod}：</span>
+                  <span className="break-all">{applicant.contactValue}</span>
+                </p>
+                {applicant.status === "pending" && (
+                  <div className="mt-3 flex gap-2">
+                    <Button onClick={() => void review(applicant.id, "approved")} size="sm">承認する</Button>
+                    <Button onClick={() => void review(applicant.id, "rejected")} variant="outline" size="sm">お断り</Button>
+                  </div>
+                )}
               </article>
             ))}
           </div>
@@ -1616,6 +1773,8 @@ function AdminPage({
   const [data, setData] = useState<{
     users?: Array<{ id: string; email: string; display_name: string; role: string }>;
     counts?: Record<string, number>;
+    reports?: Array<{ id: string; post_type: PostType; post_id: string; reason: string; details: string; status: string; created_at: string }>;
+    inquiries?: Array<{ id: string; name: string; email: string; message: string; status: string; created_at: string }>;
     error?: string;
   }>({});
   const [allPosts, setAllPosts] = useState<Post[]>([]);
@@ -1627,11 +1786,29 @@ function AdminPage({
       })
       .catch((error) => setData({ error: error.message }));
   }, []);
+  async function resolve(target: "report" | "inquiry", id: string) {
+    try {
+      await readJson(await fetch("/api/admin", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ target, id }),
+      }));
+      setData((current) => ({
+        ...current,
+        reports: current.reports?.map((item) => target === "report" && item.id === id ? { ...item, status: "resolved" } : item),
+        inquiries: current.inquiries?.map((item) => target === "inquiry" && item.id === id ? { ...item, status: "resolved" } : item),
+      }));
+    } catch (cause) {
+      setData((current) => ({ ...current, error: cause instanceof Error ? cause.message : "更新できませんでした" }));
+    }
+  }
   const countLabels: Record<string, string> = {
     practices: "練習会",
     members: "メンバー募集",
     events: "イベント",
     users: "ユーザー",
+    reports: "未対応の通報",
+    inquiries: "未対応の問い合わせ",
   };
   return (
     <>
@@ -1651,6 +1828,46 @@ function AdminPage({
               </div>
             ))}
           </div>
+          <section className="mt-8 rounded-xl border border-zinc-200 bg-white p-5">
+            <h2 className="text-xl font-black">通報</h2>
+            <div className="mt-4 divide-y">
+              {data.reports?.length ? data.reports.map((report) => {
+                const targetPost = allPosts.find((post) => post.type === report.post_type && post.id === report.post_id);
+                return (
+                  <div key={report.id} className="py-4">
+                    <div className="flex items-center gap-2">
+                      <Badge variant={report.status === "open" ? "destructive" : "secondary"}>{report.status === "open" ? "未対応" : "対応済み"}</Badge>
+                      <strong className="text-sm">{report.reason}</strong>
+                    </div>
+                    {report.details && <p className="mt-2 whitespace-pre-wrap text-sm text-zinc-600">{report.details}</p>}
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {targetPost && <Button onClick={() => onOpen(targetPost)} variant="outline" size="sm">投稿を見る</Button>}
+                      {targetPost && report.status === "open" && <Button onClick={() => onManage(targetPost, "delete")} variant="destructive" size="sm">投稿を削除</Button>}
+                      {report.status === "open" && <Button onClick={() => void resolve("report", report.id)} variant="secondary" size="sm">対応済みにする</Button>}
+                    </div>
+                  </div>
+                );
+              }) : <p className="py-4 text-sm text-zinc-500">通報はありません</p>}
+            </div>
+          </section>
+          <section className="mt-8 rounded-xl border border-zinc-200 bg-white p-5">
+            <h2 className="text-xl font-black">お問い合わせ</h2>
+            <div className="mt-4 divide-y">
+              {data.inquiries?.length ? data.inquiries.map((inquiry) => (
+                <div key={inquiry.id} className="py-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="font-bold">{inquiry.name}</p>
+                      <a href={`mailto:${inquiry.email}`} className="text-sm text-primary underline">{inquiry.email}</a>
+                    </div>
+                    <Badge variant={inquiry.status === "open" ? "destructive" : "secondary"}>{inquiry.status === "open" ? "未対応" : "対応済み"}</Badge>
+                  </div>
+                  <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-zinc-600">{inquiry.message}</p>
+                  {inquiry.status === "open" && <Button onClick={() => void resolve("inquiry", inquiry.id)} variant="secondary" size="sm" className="mt-3">対応済みにする</Button>}
+                </div>
+              )) : <p className="py-4 text-sm text-zinc-500">お問い合わせはありません</p>}
+            </div>
+          </section>
           <section className="mt-8 rounded-xl border border-zinc-200 bg-white p-5">
             <h2 className="text-xl font-black">投稿・イベント管理</h2>
             <div className="mt-4 divide-y">
