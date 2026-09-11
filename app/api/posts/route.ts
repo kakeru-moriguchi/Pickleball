@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { count, normalizeType, required, tableFor, type PostType } from "@/lib/posts";
+import { getGuestId } from "@/lib/guest";
 
 type Raw = Record<string, unknown>;
 
@@ -48,9 +49,7 @@ export async function GET(request: NextRequest) {
       supabase.from("member_posts").select("*").order("tournament_date").limit(100),
       supabase.from("event_posts").select("*").order("held_on").limit(100),
       supabase.rpc("get_post_participation_counts"),
-      user
-        ? supabase.from("participations").select("post_type,post_id").eq("user_id", user.id)
-        : Promise.resolve({ data: [], error: null }),
+      supabase.rpc("get_my_participations", { p_guest_id: getGuestId(request) }),
     ]);
     const firstError = queries.find((result) => result.error)?.error;
     if (firstError) throw firstError;
@@ -58,8 +57,8 @@ export async function GET(request: NextRequest) {
     (queries[3].data ?? []).forEach((row: Raw) => {
       countMap[`${row.post_type}:${row.post_id}`] = Number(row.participant_count);
     });
-    const joined = new Set(
-      (queries[4].data ?? []).map((row: Raw) => `${row.post_type}:${row.post_id}`),
+    const joined = new Set<string>(
+      ((queries[4].data ?? []) as Raw[]).map((row) => `${row.post_type}:${row.post_id}`),
     );
     let posts = [
       ...(queries[0].data ?? []).map((row) => mapPost("practice", row, countMap, joined)),

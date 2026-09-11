@@ -10,7 +10,8 @@ export default function PrivacyPage() {
         <div className="mt-8 space-y-7 text-sm leading-7">
           <section>
             <h2 className="text-base font-bold">取得する情報</h2>
-            <p className="mt-2">みんなでピックル！！は、アカウント登録時のメールアドレス、表示名、都道府県、競技レベル、ユーザーが投稿した募集内容および参加情報を取得します。Googleログインを利用した場合は、Googleから提供される氏名、メールアドレスなどの基本プロフィール情報を取得します。</p>
+            <p className="mt-2">みんなでピックル！！は、アカウント登録時のメールアドレス、表示名、都道府県、競技レベル、ユーザーが投稿した募集内容および参加情報を取得します。参加・応募時には、氏名、レベル、参加人数、パドル・ネット・ボールの有無を取得します。Googleログインを利用した場合は、Googleから提供される氏名、メールアドレスなどの基本プロフィール情報を取得します。</p>
+            <p className="mt-2">アカウントなしでの応募とキャンセルを同じ端末で識別するため、推測困難なランダム識別子をブラウザのCookieに保存します。この識別子は広告目的には利用しません。</p>
           </section>
           <section>
             <h2 className="text-base font-bold">利用目的</h2>

@@ -42,6 +42,18 @@ type UserProfile = {
   level: string;
   role: string;
 };
+type ParticipationApplication = {
+  applicantName: string;
+  level: string;
+  partySize: number;
+  hasPaddle: boolean;
+  hasNet: boolean;
+  hasBall: boolean;
+};
+type Applicant = ParticipationApplication & {
+  id: string;
+  created_at: string;
+};
 type Me = {
   signedIn: boolean;
   user?: UserProfile;
@@ -127,6 +139,7 @@ export function PickleApp() {
   const [screen, setScreen] = useState<Screen>("home");
   const [posts, setPosts] = useState<Post[]>([]);
   const [selected, setSelected] = useState<Post | null>(null);
+  const [applying, setApplying] = useState<Post | null>(null);
   const [createType, setCreateType] = useState<PostType | null>(null);
   const [editing, setEditing] = useState<Post | null>(null);
   const [q, setQ] = useState("");
@@ -284,7 +297,7 @@ export function PickleApp() {
     void loadPosts();
   };
 
-  async function participate(post: Post) {
+  async function cancelParticipation(post: Post) {
     if (post.is_demo) {
       setNotice("これは開発用サンプルです。実際の募集では参加できます");
       return;
@@ -292,17 +305,30 @@ export function PickleApp() {
     try {
       await readJson(
         await fetch("/api/participations", {
-          method: post.viewer_joined ? "DELETE" : "POST",
+          method: "DELETE",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ type: post.type, postId: post.id }),
         }),
       );
-      setNotice(post.viewer_joined ? "参加をキャンセルしました" : "参加を受け付けました");
+      setNotice("参加をキャンセルしました");
       setSelected(null);
       await loadPosts();
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "処理に失敗しました");
     }
+  }
+
+  async function applyForPost(post: Post, application: ParticipationApplication) {
+    await readJson(
+      await fetch("/api/participations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: post.type, postId: post.id, ...application }),
+      }),
+    );
+    setApplying(null);
+    setNotice(post.type === "member" ? "参加希望を受け付けました" : "参加を受け付けました");
+    await loadPosts();
   }
 
   async function manage(post: Post, action: "close" | "delete") {
@@ -448,7 +474,24 @@ export function PickleApp() {
         </Button>
       )}
 
-      <DetailDialog post={selected} onClose={() => setSelected(null)} onParticipate={participate} />
+      <DetailDialog
+        post={selected}
+        onClose={() => setSelected(null)}
+        onParticipate={(post) => {
+          if (post.viewer_joined) {
+            void cancelParticipation(post);
+          } else {
+            setSelected(null);
+            setApplying(post);
+          }
+        }}
+      />
+      <ApplicationDialog
+        post={applying}
+        me={me}
+        onClose={() => setApplying(null)}
+        onApply={applyForPost}
+      />
     </div>
   );
 }
@@ -896,6 +939,108 @@ function DetailDialog({
   );
 }
 
+function ApplicationDialog({
+  post,
+  me,
+  onClose,
+  onApply,
+}: {
+  post: Post | null;
+  me: Me;
+  onClose: () => void;
+  onApply: (post: Post, application: ParticipationApplication) => Promise<void>;
+}) {
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  if (!post) return null;
+  const available = Math.max(1, post.capacity - post.participant_count);
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!post) return;
+    const form = new FormData(event.currentTarget);
+    setSaving(true);
+    setError("");
+    try {
+      await onApply(post, {
+        applicantName: String(form.get("applicantName") ?? ""),
+        level: String(form.get("level") ?? ""),
+        partySize: Number(form.get("partySize")),
+        hasPaddle: form.get("hasPaddle") === "true",
+        hasNet: form.get("hasNet") === "true",
+        hasBall: form.get("hasBall") === "true",
+      });
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "応募できませんでした");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Dialog open={!!post} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-h-[90vh] overflow-y-auto rounded-xl sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>参加・応募情報</DialogTitle>
+          <DialogDescription>
+            「{post.title}」の主催者に伝える内容です。アカウントなしでも応募できます。
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={submit} className="space-y-4">
+          <Field
+            label="お名前"
+            name="applicantName"
+            placeholder="主催者に表示する名前"
+            defaultValue={me.user?.display_name}
+          />
+          <SelectField
+            label="レベル"
+            name="level"
+            options={levelOptions}
+            defaultValue={me.user?.level}
+          />
+          <label className="block">
+            <span className="mb-2 block text-sm font-bold">参加人数</span>
+            <Input
+              name="partySize"
+              type="number"
+              min="1"
+              max={available}
+              defaultValue="1"
+              required
+              className="h-11 rounded-lg"
+            />
+            <span className="mt-1 block text-xs text-muted-foreground">残り{available}名まで応募できます</span>
+          </label>
+          <div className="grid grid-cols-3 gap-2">
+            {[
+              ["hasPaddle", "パドル"],
+              ["hasNet", "ネット"],
+              ["hasBall", "ボール"],
+            ].map(([name, label]) => (
+              <label key={name} className="block">
+                <span className="mb-2 block text-xs font-bold">{label}</span>
+                <NativeSelect name={name} defaultValue="false" className="w-full" aria-label={`${label}の有無`}>
+                  <NativeSelectOption value="true">あり</NativeSelectOption>
+                  <NativeSelectOption value="false">なし</NativeSelectOption>
+                </NativeSelect>
+              </label>
+            ))}
+          </div>
+          {error && (
+            <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-700">
+              {error}
+            </p>
+          )}
+          <Button type="submit" disabled={saving} className="h-11 w-full font-bold">
+            {saving ? "送信中…" : post.type === "member" ? "参加希望を送る" : "参加を申し込む"}
+          </Button>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function CreateScreen({
   type,
   initial,
@@ -1236,6 +1381,7 @@ function MyPage({
   onAdmin: () => void;
   onProfileSaved: (user: UserProfile) => void;
 }) {
+  const [applicantsPost, setApplicantsPost] = useState<Post | null>(null);
   if (!me.signedIn)
     return (
       <div className="mx-auto max-w-lg rounded-xl border border-zinc-200 bg-white p-7 text-center">
@@ -1295,7 +1441,10 @@ function MyPage({
                     {formatDate(post.held_on)}・{post.venue}
                   </p>
                 </button>
-                <div className="mt-3 flex gap-2 border-t pt-3">
+                <div className="mt-3 flex flex-wrap gap-2 border-t pt-3">
+                  <Button onClick={() => setApplicantsPost(post)} variant="outline" size="sm">
+                    応募者を見る
+                  </Button>
                   <Button onClick={() => onEdit(post)} variant="outline" size="sm">
                     編集
                   </Button>
@@ -1325,7 +1474,60 @@ function MyPage({
           <Empty text="参加予定はまだありません" />
         )}
       </section>
+      <ApplicantsDialog post={applicantsPost} onClose={() => setApplicantsPost(null)} />
     </>
+  );
+}
+
+function ApplicantsDialog({ post, onClose }: { post: Post | null; onClose: () => void }) {
+  const [applicants, setApplicants] = useState<Applicant[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!post) return;
+    setLoading(true);
+    setError("");
+    void fetch(`/api/participations?type=${post.type}&postId=${encodeURIComponent(post.id)}`)
+      .then(readJson)
+      .then((data) => setApplicants(data.applicants as Applicant[]))
+      .catch((cause) => setError(cause instanceof Error ? cause.message : "応募者を読み込めませんでした"))
+      .finally(() => setLoading(false));
+  }, [post]);
+
+  return (
+    <Dialog open={!!post} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-h-[90vh] overflow-y-auto rounded-xl sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>応募者</DialogTitle>
+          <DialogDescription>{post?.title}</DialogDescription>
+        </DialogHeader>
+        {loading ? (
+          <p className="py-6 text-center text-sm text-muted-foreground">読み込み中…</p>
+        ) : error ? (
+          <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
+        ) : applicants.length ? (
+          <div className="space-y-3">
+            {applicants.map((applicant) => (
+              <article key={applicant.id} className="rounded-lg border border-zinc-200 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="font-black">{applicant.applicantName}</h3>
+                  <Badge variant="secondary">{applicant.partySize}名</Badge>
+                </div>
+                <p className="mt-1 text-sm text-zinc-600">{applicant.level}</p>
+                <div className="mt-3 flex flex-wrap gap-2 text-xs text-zinc-600">
+                  <span>パドル：{applicant.hasPaddle ? "あり" : "なし"}</span>
+                  <span>ネット：{applicant.hasNet ? "あり" : "なし"}</span>
+                  <span>ボール：{applicant.hasBall ? "あり" : "なし"}</span>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <Empty text="応募者はまだいません" />
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }
 
