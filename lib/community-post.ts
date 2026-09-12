@@ -21,7 +21,12 @@ export type CommunityPost = {
   application_method: string;
   viewer_joined: number;
   viewer_status?: "pending" | "approved" | "rejected" | "";
+  viewer_participation_id?: string;
+  viewer_unread_count?: number;
+  viewer_chat_blocked?: boolean;
+  viewer_chat_blocked_by_me?: boolean;
   pending_count?: number;
+  organizer_unread_count?: number;
   created_at: string;
   is_demo?: boolean;
 };

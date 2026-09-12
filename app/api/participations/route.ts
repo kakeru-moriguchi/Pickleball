@@ -27,6 +27,9 @@ type ApplicantRow = {
   contact_method: string;
   contact_value: string;
   application_status: "pending" | "approved" | "rejected";
+  unread_count: number;
+  chat_blocked: boolean;
+  blocked_by_me: boolean;
   created_at: string;
 };
 
@@ -121,6 +124,9 @@ export async function GET(request: NextRequest) {
       contactMethod: row.contact_method,
       contactValue: row.contact_value,
       status: row.application_status,
+      unreadCount: Number(row.unread_count ?? 0),
+      chatBlocked: row.chat_blocked,
+      blockedByMe: row.blocked_by_me,
       created_at: row.created_at,
     })),
   });

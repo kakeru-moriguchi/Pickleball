@@ -10,6 +10,7 @@ import {
   Home,
   MapPin,
   MapPinned,
+  MessageCircle,
   Search,
   Trophy,
   UserRound,
@@ -30,6 +31,7 @@ import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
 import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
 import { developmentSamplePosts, type CommunityPost } from "@/lib/community-post";
+import { createClient as createBrowserClient } from "@/lib/supabase/client";
 
 type PostType = "practice" | "member" | "event";
 type Screen = "home" | PostType | "create" | "mypage" | "admin";
@@ -56,7 +58,12 @@ type Applicant = ParticipationApplication & {
   id: string;
   created_at: string;
   status: "pending" | "approved" | "rejected";
+  unreadCount: number;
+  chatBlocked: boolean;
+  blockedByMe: boolean;
 };
+type ChatTarget = { participationId: string; title: string; counterpart: string; blocked?: boolean; blockedByMe?: boolean };
+type ChatMessage = { id: string; body: string; senderRole: "applicant" | "organizer"; isMine: boolean; createdAt: string };
 type Me = {
   signedIn: boolean;
   user?: UserProfile;
@@ -149,6 +156,7 @@ export function PickleApp() {
   const [selected, setSelected] = useState<Post | null>(null);
   const [applying, setApplying] = useState<Post | null>(null);
   const [reporting, setReporting] = useState<Post | null>(null);
+  const [chatTarget, setChatTarget] = useState<ChatTarget | null>(null);
   const [createType, setCreateType] = useState<PostType | null>(null);
   const [editing, setEditing] = useState<Post | null>(null);
   const [q, setQ] = useState("");
@@ -449,6 +457,7 @@ export function PickleApp() {
             onManage={manage}
             onAdmin={() => go("admin")}
             onProfileSaved={(user) => setMe({ signedIn: true, user })}
+            onChat={setChatTarget}
           />
         )}
         {screen === "admin" && (
@@ -498,6 +507,10 @@ export function PickleApp() {
           setSelected(null);
           setReporting(post);
         }}
+        onChat={(post) => {
+          setSelected(null);
+          setChatTarget({ participationId: post.viewer_participation_id!, title: post.title, counterpart: `主催：${post.organizer}`, blocked: post.viewer_chat_blocked, blockedByMe: post.viewer_chat_blocked_by_me });
+        }}
       />
       <ApplicationDialog
         post={applying}
@@ -513,6 +526,7 @@ export function PickleApp() {
           setNotice("通報を受け付けました。管理者が確認します");
         }}
       />
+      <ChatDialog target={chatTarget} signedIn={me.signedIn} onClose={() => setChatTarget(null)} />
       <footer className="mx-auto mt-10 max-w-5xl border-t border-zinc-200 px-4 py-8 text-center text-xs text-zinc-500 md:px-8">
         <div className="flex justify-center gap-5">
           <a href="/contact" className="hover:text-primary">お問い合わせ</a>
@@ -891,11 +905,13 @@ function DetailDialog({
   onClose,
   onParticipate,
   onReport,
+  onChat,
 }: {
   post: Post | null;
   onClose: () => void;
   onParticipate: (p: Post) => void;
   onReport: (p: Post) => void;
+  onChat: (p: Post) => void;
 }) {
   if (!post) return null;
   const full = post.status === "closed" || post.participant_count >= post.capacity;
@@ -965,6 +981,12 @@ function DetailDialog({
           <div className="min-w-20 text-sm">
             <strong className="text-lg">{post.participant_count}</strong> / {post.capacity}人
           </div>
+          {post.viewer_participation_id && post.viewer_joined ? (
+            <Button onClick={() => onChat(post)} variant="outline" className="relative h-12 rounded-lg px-3 font-bold">
+              <MessageCircle className="size-5" /><span className="hidden sm:inline">トーク</span>
+              {!!post.viewer_unread_count && <span className="absolute -right-1 -top-1 grid min-w-5 place-items-center rounded-full bg-primary px-1 text-[10px] text-white">{post.viewer_unread_count}</span>}
+            </Button>
+          ) : null}
           <Button
             disabled={!!post.is_demo || (full && !post.viewer_joined)}
             onClick={() => onParticipate(post)}
@@ -1509,6 +1531,7 @@ function MyPage({
   onManage,
   onAdmin,
   onProfileSaved,
+  onChat,
 }: {
   me: Me;
   mine: Post[];
@@ -1518,6 +1541,7 @@ function MyPage({
   onManage: (p: Post, a: "close" | "delete") => void;
   onAdmin: () => void;
   onProfileSaved: (user: UserProfile) => void;
+  onChat: (target: ChatTarget) => void;
 }) {
   const [applicantsPost, setApplicantsPost] = useState<Post | null>(null);
   if (!me.signedIn)
@@ -1582,9 +1606,9 @@ function MyPage({
                 <div className="mt-3 flex flex-wrap gap-2 border-t pt-3">
                   <Button onClick={() => setApplicantsPost(post)} variant="outline" size="sm">
                     応募者を見る
-                    {!!post.pending_count && (
+                    {!!((post.pending_count ?? 0) + (post.organizer_unread_count ?? 0)) && (
                       <span className="ml-1 rounded-full bg-primary px-1.5 py-0.5 text-[10px] text-white">
-                        {post.pending_count}
+                        {(post.pending_count ?? 0) + (post.organizer_unread_count ?? 0)}
                       </span>
                     )}
                   </Button>
@@ -1615,6 +1639,12 @@ function MyPage({
                   {p.viewer_status === "approved" ? "参加確定" : "承認待ち"}
                 </span>
                 <PostCard post={p} onOpen={onOpen} />
+                {p.viewer_participation_id && (
+                  <Button onClick={() => onChat({ participationId: p.viewer_participation_id!, title: p.title, counterpart: `主催：${p.organizer}`, blocked: p.viewer_chat_blocked, blockedByMe: p.viewer_chat_blocked_by_me })} variant="outline" size="sm" className="absolute bottom-3 right-3 bg-white">
+                    <MessageCircle className="size-4" /> トーク
+                    {!!p.viewer_unread_count && <span className="rounded-full bg-primary px-1.5 text-[10px] text-white">{p.viewer_unread_count}</span>}
+                  </Button>
+                )}
               </div>
             ))}
           </div>
@@ -1622,12 +1652,12 @@ function MyPage({
           <Empty text="参加予定はまだありません" />
         )}
       </section>
-      <ApplicantsDialog post={applicantsPost} onClose={() => setApplicantsPost(null)} />
+      <ApplicantsDialog post={applicantsPost} onClose={() => setApplicantsPost(null)} onChat={(target) => { setApplicantsPost(null); onChat(target); }} />
     </>
   );
 }
 
-function ApplicantsDialog({ post, onClose }: { post: Post | null; onClose: () => void }) {
+function ApplicantsDialog({ post, onClose, onChat }: { post: Post | null; onClose: () => void; onChat: (target: ChatTarget) => void }) {
   const [applicants, setApplicants] = useState<Applicant[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -1697,6 +1727,10 @@ function ApplicantsDialog({ post, onClose }: { post: Post | null; onClose: () =>
                   <span className="font-bold">{applicant.contactMethod}：</span>
                   <span className="break-all">{applicant.contactValue}</span>
                 </p>
+                <Button onClick={() => onChat({ participationId: applicant.id, title: post?.title ?? "応募者とのトーク", counterpart: applicant.applicantName, blocked: applicant.chatBlocked, blockedByMe: applicant.blockedByMe })} variant="outline" size="sm" className="mt-3">
+                  <MessageCircle className="size-4" /> トーク
+                  {!!applicant.unreadCount && <span className="rounded-full bg-primary px-1.5 text-[10px] text-white">{applicant.unreadCount}</span>}
+                </Button>
                 {applicant.status === "pending" && (
                   <div className="mt-3 flex gap-2">
                     <Button onClick={() => void review(applicant.id, "approved")} size="sm">承認する</Button>
@@ -1709,6 +1743,142 @@ function ApplicantsDialog({ post, onClose }: { post: Post | null; onClose: () =>
         ) : (
           <Empty text="応募者はまだいません" />
         )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ChatDialog({ target, signedIn, onClose }: { target: ChatTarget | null; signedIn: boolean; onClose: () => void }) {
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [blocked, setBlocked] = useState(false);
+  const [blockedByMe, setBlockedByMe] = useState(false);
+  const [error, setError] = useState("");
+  const [reportId, setReportId] = useState("");
+  const [reportSent, setReportSent] = useState(false);
+
+  const loadMessages = useCallback(async () => {
+    if (!target) return;
+    try {
+      const data = await readJson(await fetch(`/api/messages?participationId=${encodeURIComponent(target.participationId)}`, { cache: "no-store" }));
+      setMessages(data.messages as ChatMessage[]);
+      setError("");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "トークを読み込めませんでした");
+    } finally {
+      setLoading(false);
+    }
+  }, [target]);
+
+  useEffect(() => {
+    if (!target) return;
+    setMessages([]);
+    setBlocked(!!target.blocked);
+    setBlockedByMe(!!target.blockedByMe);
+    setReportId("");
+    setReportSent(false);
+    setLoading(true);
+    void loadMessages();
+    const timer = window.setInterval(() => void loadMessages(), 5000);
+    return () => window.clearInterval(timer);
+  }, [target, loadMessages]);
+
+  useEffect(() => {
+    if (!target || !signedIn) return;
+    const supabase = createBrowserClient();
+    const channel = supabase
+      .channel(`messages-${target.participationId}`)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages", filter: `participation_id=eq.${target.participationId}` }, () => void loadMessages())
+      .subscribe();
+    return () => { void supabase.removeChannel(channel); };
+  }, [target, signedIn, loadMessages]);
+
+  async function send(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!target) return;
+    const form = event.currentTarget;
+    const body = String(new FormData(form).get("message") ?? "").trim();
+    if (!body) return;
+    setSaving(true);
+    setError("");
+    try {
+      await readJson(await fetch("/api/messages", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ participationId: target.participationId, body }) }));
+      form.reset();
+      await loadMessages();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "送信できませんでした");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function toggleBlocked() {
+    if (!target) return;
+    setError("");
+    try {
+      await readJson(await fetch("/api/messages", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ participationId: target.participationId, blocked: !blockedByMe }) }));
+      setBlocked(!blockedByMe);
+      setBlockedByMe(!blockedByMe);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "設定を変更できませんでした");
+    }
+  }
+
+  async function reportMessage(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!reportId) return;
+    const body = Object.fromEntries(new FormData(event.currentTarget));
+    setSaving(true);
+    setError("");
+    try {
+      await readJson(await fetch("/api/message-reports", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...body, messageId: reportId }) }));
+      setReportId("");
+      setReportSent(true);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "通報できませんでした");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Dialog open={!!target} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="flex max-h-[90vh] flex-col rounded-xl sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="pr-8">{target?.counterpart}とのトーク</DialogTitle>
+          <DialogDescription>{target?.title}についての連絡です。住所・電話番号などの送信にはご注意ください。</DialogDescription>
+        </DialogHeader>
+        <div className="min-h-48 flex-1 space-y-3 overflow-y-auto rounded-lg bg-zinc-50 p-3">
+          {loading ? <p className="py-10 text-center text-sm text-zinc-500">読み込み中…</p> : messages.length ? messages.map((message) => (
+            <div key={message.id} className={`flex ${message.isMine ? "justify-end" : "justify-start"}`}>
+              <div className="max-w-[82%]">
+                <div className={`rounded-2xl px-3 py-2 text-sm leading-6 ${message.isMine ? "rounded-br-sm bg-primary text-white" : "rounded-bl-sm border border-zinc-200 bg-white text-zinc-800"}`}>{message.body}</div>
+                <div className={`mt-1 flex items-center gap-2 text-[10px] text-zinc-400 ${message.isMine ? "justify-end" : ""}`}>
+                  <span>{new Date(message.createdAt).toLocaleString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
+                  {!message.isMine && <button onClick={() => { setReportId(message.id); setReportSent(false); }} className="underline hover:text-red-600">通報</button>}
+                </div>
+              </div>
+            </div>
+          )) : <p className="py-10 text-center text-sm text-zinc-500">まだメッセージはありません</p>}
+        </div>
+        {reportId && (
+          <form onSubmit={reportMessage} className="space-y-2 rounded-lg border border-red-100 bg-red-50 p-3">
+            <p className="text-sm font-bold text-red-800">このメッセージを管理者へ通報</p>
+            <NativeSelect name="reason" required className="w-full bg-white">
+              {['迷惑行為・勧誘', '不適切な内容', '個人情報の要求', 'その他'].map((reason) => <NativeSelectOption key={reason}>{reason}</NativeSelectOption>)}
+            </NativeSelect>
+            <Textarea name="details" maxLength={1000} rows={2} placeholder="詳細（任意）" className="bg-white" />
+            <div className="flex gap-2"><Button type="submit" size="sm" variant="destructive" disabled={saving}>通報する</Button><Button type="button" size="sm" variant="ghost" onClick={() => setReportId("")}>やめる</Button></div>
+          </form>
+        )}
+        {reportSent && <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">通報を受け付けました。</p>}
+        {error && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+        <form onSubmit={send} className="flex gap-2">
+          <Input name="message" maxLength={1000} disabled={blocked || saving} autoComplete="off" placeholder={blocked ? "このトークは停止中です" : "メッセージを入力"} className="h-11" />
+          <Button type="submit" disabled={blocked || saving} className="h-11">送信</Button>
+        </form>
+        {blocked && !blockedByMe ? <p className="text-xs text-zinc-500">相手がこのトークを停止しています。</p> : <button onClick={() => void toggleBlocked()} className="self-start text-xs text-zinc-500 underline hover:text-red-600">{blockedByMe ? "トーク停止を解除" : "この相手とのトークを停止"}</button>}
       </DialogContent>
     </Dialog>
   );
@@ -1801,6 +1971,7 @@ function AdminPage({
     counts?: Record<string, number>;
     reports?: Array<{ id: string; post_type: PostType; post_id: string; reason: string; details: string; status: string; created_at: string }>;
     inquiries?: Array<{ id: string; name: string; email: string; message: string; status: string; created_at: string }>;
+    messageReports?: Array<{ id: string; message_id: string; reason: string; details: string; status: string; created_at: string; messages?: { body?: string; sender_role?: string } | null }>;
     error?: string;
   }>({});
   const [allPosts, setAllPosts] = useState<Post[]>([]);
@@ -1812,7 +1983,7 @@ function AdminPage({
       })
       .catch((error) => setData({ error: error.message }));
   }, []);
-  async function resolve(target: "report" | "inquiry", id: string) {
+  async function resolve(target: "report" | "inquiry" | "message_report", id: string) {
     try {
       await readJson(await fetch("/api/admin", {
         method: "PATCH",
@@ -1823,6 +1994,7 @@ function AdminPage({
         ...current,
         reports: current.reports?.map((item) => target === "report" && item.id === id ? { ...item, status: "resolved" } : item),
         inquiries: current.inquiries?.map((item) => target === "inquiry" && item.id === id ? { ...item, status: "resolved" } : item),
+        messageReports: current.messageReports?.map((item) => target === "message_report" && item.id === id ? { ...item, status: "resolved" } : item),
       }));
     } catch (cause) {
       setData((current) => ({ ...current, error: cause instanceof Error ? cause.message : "更新できませんでした" }));
@@ -1835,6 +2007,7 @@ function AdminPage({
     users: "ユーザー",
     reports: "未対応の通報",
     inquiries: "未対応の問い合わせ",
+    messageReports: "未対応のDM通報",
   };
   return (
     <>
@@ -1874,6 +2047,19 @@ function AdminPage({
                   </div>
                 );
               }) : <p className="py-4 text-sm text-zinc-500">通報はありません</p>}
+            </div>
+          </section>
+          <section className="mt-8 rounded-xl border border-zinc-200 bg-white p-5">
+            <h2 className="text-xl font-black">DMの通報</h2>
+            <div className="mt-4 divide-y">
+              {data.messageReports?.length ? data.messageReports.map((report) => (
+                <div key={report.id} className="py-4">
+                  <div className="flex items-center gap-2"><Badge variant={report.status === "open" ? "destructive" : "secondary"}>{report.status === "open" ? "未対応" : "対応済み"}</Badge><strong className="text-sm">{report.reason}</strong></div>
+                  <p className="mt-2 rounded-md bg-zinc-50 px-3 py-2 text-sm text-zinc-700">対象メッセージ：{report.messages?.body || "削除済み"}</p>
+                  {report.details && <p className="mt-2 whitespace-pre-wrap text-sm text-zinc-600">{report.details}</p>}
+                  {report.status === "open" && <Button onClick={() => void resolve("message_report", report.id)} variant="secondary" size="sm" className="mt-3">対応済みにする</Button>}
+                </div>
+              )) : <p className="py-4 text-sm text-zinc-500">DMの通報はありません</p>}
             </div>
           </section>
           <section className="mt-8 rounded-xl border border-zinc-200 bg-white p-5">

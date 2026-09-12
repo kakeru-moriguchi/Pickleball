@@ -4,16 +4,19 @@ import { count, normalizeType, required, tableFor, timeRange, type PostType } fr
 import { getGuestId } from "@/lib/guest";
 
 type Raw = Record<string, unknown>;
+type ViewerParticipation = { status: string; id: string; unread: number; blocked: boolean; blockedByMe: boolean };
 
 function mapPost(
   type: PostType,
   row: Raw,
   counts: Record<string, number>,
-  participations: Map<string, string>,
+  participations: Map<string, ViewerParticipation>,
   pendingCounts: Record<string, number>,
+  organizerUnread: Record<string, number>,
 ) {
   const id = String(row.id);
-  const viewerStatus = participations.get(`${type}:${id}`) ?? "";
+  const viewer = participations.get(`${type}:${id}`);
+  const viewerStatus = viewer?.status ?? "";
   return {
     type,
     id,
@@ -43,7 +46,12 @@ function mapPost(
     application_method: type === "event" ? row.application_method : "",
     viewer_joined: viewerStatus && viewerStatus !== "rejected" ? 1 : 0,
     viewer_status: viewerStatus,
+    viewer_participation_id: viewer?.id ?? "",
+    viewer_unread_count: viewer?.unread ?? 0,
+    viewer_chat_blocked: viewer?.blocked ?? false,
+    viewer_chat_blocked_by_me: viewer?.blockedByMe ?? false,
     pending_count: pendingCounts[`${type}:${id}`] ?? 0,
+    organizer_unread_count: organizerUnread[`${type}:${id}`] ?? 0,
   };
 }
 
@@ -69,18 +77,26 @@ export async function GET(request: NextRequest) {
     (queries[3].data ?? []).forEach((row: Raw) => {
       countMap[`${row.post_type}:${row.post_id}`] = Number(row.participant_count);
     });
-    const participations = new Map<string, string>();
+    const participations = new Map<string, ViewerParticipation>();
     ((queries[4].data ?? []) as Raw[]).forEach((row) =>
-      participations.set(`${row.post_type}:${row.post_id}`, String(row.participation_status)),
+      participations.set(`${row.post_type}:${row.post_id}`, {
+        status: String(row.participation_status),
+        id: String(row.participation_id),
+        unread: Number(row.unread_count ?? 0),
+        blocked: row.chat_blocked === true,
+        blockedByMe: row.blocked_by_me === true,
+      }),
     );
     const pendingCounts: Record<string, number> = {};
+    const organizerUnread: Record<string, number> = {};
     ((queries[5].data ?? []) as Raw[]).forEach((row) => {
       pendingCounts[`${row.post_type}:${row.post_id}`] = Number(row.pending_count);
+      organizerUnread[`${row.post_type}:${row.post_id}`] = Number(row.unread_count ?? 0);
     });
     let posts = [
-      ...(queries[0].data ?? []).map((row) => mapPost("practice", row, countMap, participations, pendingCounts)),
-      ...(queries[1].data ?? []).map((row) => mapPost("member", row, countMap, participations, pendingCounts)),
-      ...(queries[2].data ?? []).map((row) => mapPost("event", row, countMap, participations, pendingCounts)),
+      ...(queries[0].data ?? []).map((row) => mapPost("practice", row, countMap, participations, pendingCounts, organizerUnread)),
+      ...(queries[1].data ?? []).map((row) => mapPost("member", row, countMap, participations, pendingCounts, organizerUnread)),
+      ...(queries[2].data ?? []).map((row) => mapPost("event", row, countMap, participations, pendingCounts, organizerUnread)),
     ];
     const p = request.nextUrl.searchParams;
     const type = normalizeType(p.get("type"));
