@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { count, normalizeType, required, tableFor, type PostType } from "@/lib/posts";
+import { count, normalizeType, required, tableFor, timeRange, type PostType } from "@/lib/posts";
 import { getGuestId } from "@/lib/guest";
 
 type Raw = Record<string, unknown>;
@@ -127,8 +127,7 @@ function values(type: PostType, body: Record<string, unknown>, userId: string) {
       author_id: userId,
       title: required(body, "title"),
       held_on: required(body, "heldOn"),
-      start_time: required(body, "startTime"),
-      end_time: required(body, "endTime"),
+      ...timeRange(body),
       venue: required(body, "venue"),
       prefecture: required(body, "prefecture"),
       capacity: count(body, "capacity"),
@@ -157,8 +156,7 @@ function values(type: PostType, body: Record<string, unknown>, userId: string) {
     event_name: required(body, "title"),
     event_type: required(body, "category"),
     held_on: required(body, "heldOn"),
-    start_time: required(body, "startTime"),
-    end_time: required(body, "endTime"),
+    ...timeRange(body),
     venue: required(body, "venue"),
     prefecture: required(body, "prefecture"),
     fee: count(body, "fee", true),

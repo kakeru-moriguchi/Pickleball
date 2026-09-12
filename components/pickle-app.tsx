@@ -78,6 +78,11 @@ const labels: Record<PostType, string> = {
 const categoryOptions = ["男子ダブルス", "女子ダブルス", "ミックスダブルス", "団体戦", "その他"];
 const eventOptions = ["大会", "交流会", "練習会", "体験会", "講習会", "その他"];
 const levelOptions = ["初心者歓迎", "初級", "中級", "上級", "レベル不問"];
+const timeOptions = Array.from({ length: 48 }, (_, index) => {
+  const hours = Math.floor(index / 2).toString().padStart(2, "0");
+  const minutes = index % 2 === 0 ? "00" : "30";
+  return `${hours}:${minutes}`;
+});
 const prefectures = [
   "北海道", "青森県", "岩手県", "宮城県", "秋田県", "山形県", "福島県",
   "茨城県", "栃木県", "群馬県", "埼玉県", "千葉県", "東京都", "神奈川県",
@@ -922,7 +927,7 @@ function DetailDialog({
           </p>
           <p>
             <Clock3 className="mb-1 size-4 text-primary" />
-            {post.start_time ? `${post.start_time}〜${post.end_time}` : "時間は主催者に確認"}
+            {post.start_time ? `${formatTime(post.start_time)}〜${formatTime(post.end_time)}` : "時間は主催者に確認"}
           </p>
           <p>
             <MapPin className="mb-1 size-4 text-primary" />
@@ -1295,22 +1300,20 @@ function CreateScreen({
           }
           defaultValue={value("title")}
         />
-        <div className="grid gap-4 md:grid-cols-2">
-          <Field label="開催日" name="heldOn" type="date" defaultValue={value("heldOn")} />
-          {type === "member" ? (
+        {type === "member" ? (
+          <div className="grid gap-4 md:grid-cols-2">
+            <Field label="開催日" name="heldOn" type="date" defaultValue={value("heldOn")} />
             <Field label="募集期限" name="deadline" type="date" defaultValue={value("deadline")} />
-          ) : (
-            <>
-              <Field
-                label="開始時間"
-                name="startTime"
-                type="time"
-                defaultValue={value("startTime")}
-              />
-              <Field label="終了時間" name="endTime" type="time" defaultValue={value("endTime")} />
-            </>
-          )}
-        </div>
+          </div>
+        ) : (
+          <>
+            <Field label="開催日" name="heldOn" type="date" defaultValue={value("heldOn")} />
+            <div className="grid grid-cols-2 gap-3 md:gap-4">
+              <TimeField label="開始時間" name="startTime" defaultValue={value("startTime")} />
+              <TimeField label="終了時間" name="endTime" defaultValue={value("endTime")} />
+            </div>
+          </>
+        )}
         <div className="grid gap-4 md:grid-cols-2">
           <SelectField
             label="都道府県"
@@ -1445,6 +1448,29 @@ function Field({
         className="h-11 rounded-lg"
         min={type === "number" ? "0" : undefined}
       />
+    </label>
+  );
+}
+
+function TimeField({
+  label,
+  name,
+  defaultValue,
+}: {
+  label: string;
+  name: string;
+  defaultValue?: string | number;
+}) {
+  const normalized = String(defaultValue ?? "").slice(0, 5);
+  return (
+    <label className="block min-w-0">
+      <span className="mb-2 block text-sm font-bold">{label}</span>
+      <NativeSelect name={name} required className="w-full" defaultValue={normalized}>
+        <NativeSelectOption value="">選択してください</NativeSelectOption>
+        {timeOptions.map((time) => (
+          <NativeSelectOption key={time} value={time}>{time}</NativeSelectOption>
+        ))}
+      </NativeSelect>
     </label>
   );
 }
