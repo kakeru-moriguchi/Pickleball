@@ -124,9 +124,9 @@ declare
 begin
   select * into v_p from public.participations where participations.id = p_participation_id;
   if v_p.id is null then raise exception '応募が見つかりません'; end if;
-  if v_p.post_type = 'practice' then select author_id into v_author_id from public.practice_posts where id = v_p.post_id;
-  elsif v_p.post_type = 'member' then select author_id into v_author_id from public.member_posts where id = v_p.post_id;
-  else select author_id into v_author_id from public.event_posts where id = v_p.post_id; end if;
+  if v_p.post_type = 'practice' then select x.author_id into v_author_id from public.practice_posts x where x.id = v_p.post_id;
+  elsif v_p.post_type = 'member' then select x.author_id into v_author_id from public.member_posts x where x.id = v_p.post_id;
+  else select x.author_id into v_author_id from public.event_posts x where x.id = v_p.post_id; end if;
   if auth.uid() is not null and (auth.uid() = v_author_id or public.is_admin()) then v_role := 'organizer';
   elsif (auth.uid() is not null and auth.uid() = v_p.user_id) or (p_guest_id is not null and p_guest_id = v_p.guest_id) then v_role := 'applicant';
   else raise exception 'メッセージを確認する権限がありません'; end if;
@@ -152,9 +152,9 @@ begin
   select * into v_p from public.participations where participations.id = p_participation_id;
   if v_p.id is null then raise exception '応募が見つかりません'; end if;
   if v_p.status = 'rejected' then raise exception 'この応募のトークは終了しています'; end if;
-  if v_p.post_type = 'practice' then select author_id into v_author_id from public.practice_posts where id = v_p.post_id;
-  elsif v_p.post_type = 'member' then select author_id into v_author_id from public.member_posts where id = v_p.post_id;
-  else select author_id into v_author_id from public.event_posts where id = v_p.post_id; end if;
+  if v_p.post_type = 'practice' then select x.author_id into v_author_id from public.practice_posts x where x.id = v_p.post_id;
+  elsif v_p.post_type = 'member' then select x.author_id into v_author_id from public.member_posts x where x.id = v_p.post_id;
+  else select x.author_id into v_author_id from public.event_posts x where x.id = v_p.post_id; end if;
   if auth.uid() is not null and auth.uid() = v_author_id then v_role := 'organizer';
   elsif (auth.uid() is not null and auth.uid() = v_p.user_id) or (p_guest_id is not null and p_guest_id = v_p.guest_id) then v_role := 'applicant';
   else raise exception 'メッセージを送る権限がありません'; end if;
@@ -177,9 +177,9 @@ language plpgsql security definer set search_path = public as $$
 declare v_p public.participations%rowtype; v_author_id uuid;
 begin
   select * into v_p from public.participations where id = p_participation_id;
-  if v_p.post_type = 'practice' then select author_id into v_author_id from public.practice_posts where id = v_p.post_id;
-  elsif v_p.post_type = 'member' then select author_id into v_author_id from public.member_posts where id = v_p.post_id;
-  else select author_id into v_author_id from public.event_posts where id = v_p.post_id; end if;
+  if v_p.post_type = 'practice' then select x.author_id into v_author_id from public.practice_posts x where x.id = v_p.post_id;
+  elsif v_p.post_type = 'member' then select x.author_id into v_author_id from public.member_posts x where x.id = v_p.post_id;
+  else select x.author_id into v_author_id from public.event_posts x where x.id = v_p.post_id; end if;
   if auth.uid() is not null and auth.uid() = v_author_id then
     update public.participations set chat_blocked_by_organizer = p_blocked where id = p_participation_id;
   elsif (auth.uid() is not null and auth.uid() = v_p.user_id) or (p_guest_id is not null and p_guest_id = v_p.guest_id) then
@@ -197,9 +197,9 @@ declare v_participation_id uuid; v_p public.participations%rowtype; v_author_id 
 begin
   select participation_id into v_participation_id from public.messages where id = p_message_id;
   select * into v_p from public.participations where id = v_participation_id;
-  if v_p.post_type = 'practice' then select author_id into v_author_id from public.practice_posts where id = v_p.post_id;
-  elsif v_p.post_type = 'member' then select author_id into v_author_id from public.member_posts where id = v_p.post_id;
-  else select author_id into v_author_id from public.event_posts where id = v_p.post_id; end if;
+  if v_p.post_type = 'practice' then select x.author_id into v_author_id from public.practice_posts x where x.id = v_p.post_id;
+  elsif v_p.post_type = 'member' then select x.author_id into v_author_id from public.member_posts x where x.id = v_p.post_id;
+  else select x.author_id into v_author_id from public.event_posts x where x.id = v_p.post_id; end if;
   if not ((auth.uid() is not null and (auth.uid() = v_author_id or auth.uid() = v_p.user_id)) or (p_guest_id is not null and p_guest_id = v_p.guest_id)) then
     raise exception '通報する権限がありません';
   end if;
