@@ -27,7 +27,7 @@ export default function PrivacyPage() {
           </section>
           <section>
             <h2 className="text-base font-bold">削除・お問い合わせ</h2>
-            <p className="mt-2">登録情報の確認・修正はマイページから行えます。アカウントや関連データの削除については、<a className="font-bold text-primary underline" href="mailto:kakeru.moriguchi0505@gmail.com">kakeru.moriguchi0505@gmail.com</a> までご連絡ください。</p>
+            <p className="mt-2">登録情報の確認・修正とアカウント削除はマイページから行えます。退会すると、アカウント、本人の投稿、応募および関連するメッセージが削除されます。操作できない場合は、<a className="font-bold text-primary underline" href="mailto:kakeru.moriguchi0505@gmail.com">kakeru.moriguchi0505@gmail.com</a> までご連絡ください。</p>
           </section>
           <section>
             <h2 className="text-base font-bold">改定</h2>

@@ -21,7 +21,10 @@
 ```env
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
+SUPABASE_SECRET_KEY=your-secret-key
 ```
+
+`SUPABASE_SECRET_KEY` は退会処理のサーバーAPIだけで使用します。実値はVercelの環境変数へ保存し、ブラウザへ公開したりGitへコミットしたりしないでください。
 
 最初に登録されたユーザーには管理者権限が設定されます。
 

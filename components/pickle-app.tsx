@@ -1636,8 +1636,60 @@ function MyPage({
           <Empty text="参加予定はまだありません" />
         )}
       </section>
+      <AccountDeletion role={me.user?.role} />
       <ApplicantsDialog post={applicantsPost} onClose={() => setApplicantsPost(null)} onChat={(target) => { setApplicantsPost(null); onChat(target); }} />
     </>
+  );
+}
+
+function AccountDeletion({ role }: { role?: string }) {
+  const [open, setOpen] = useState(false);
+  const [confirmation, setConfirmation] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState("");
+  async function removeAccount() {
+    setDeleting(true);
+    setError("");
+    try {
+      await readJson(await fetch("/api/account", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirmation }),
+      }));
+      window.location.assign("/");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "アカウントを削除できませんでした");
+      setDeleting(false);
+    }
+  }
+
+  return (
+    <section className="mt-10 border-t border-zinc-200 pt-6">
+      <h2 className="text-sm font-bold text-zinc-700">アカウント管理</h2>
+      <p className="mt-1 text-xs leading-5 text-zinc-500">退会すると、投稿・応募・関連するトークも削除され、元に戻せません。{role === "admin" ? "最後の管理者アカウントは削除できません。" : ""}</p>
+      <Button onClick={() => setOpen(true)} variant="ghost" size="sm" className="mt-2 px-0 text-red-600 hover:text-red-700">
+        アカウントを削除
+      </Button>
+      <Dialog open={open} onOpenChange={(value) => { if (!deleting) { setOpen(value); setError(""); if (!value) setConfirmation(""); } }}>
+        <DialogContent className="rounded-xl sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>アカウントを削除しますか？</DialogTitle>
+            <DialogDescription>アカウント、投稿、応募、関連するトークが完全に削除されます。この操作は取り消せません。</DialogDescription>
+          </DialogHeader>
+          <label className="block">
+            <span className="mb-2 block text-sm font-bold">確認のため「削除する」と入力</span>
+            <Input value={confirmation} onChange={(event) => setConfirmation(event.target.value)} disabled={deleting} autoComplete="off" />
+          </label>
+          {error && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+          <div className="flex gap-2">
+            <Button onClick={() => setOpen(false)} disabled={deleting} variant="outline" className="flex-1">キャンセル</Button>
+            <Button onClick={() => void removeAccount()} disabled={deleting || confirmation !== "削除する"} variant="destructive" className="flex-1">
+              {deleting ? "削除中…" : "完全に削除"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </section>
   );
 }
 

@@ -14,7 +14,7 @@ export default function TermsPage() {
           </section>
           <section>
             <h2 className="text-base font-bold">アカウント</h2>
-            <p className="mt-2">利用者は正確な情報を登録し、アカウントを適切に管理してください。アカウントを第三者へ貸与または譲渡することはできません。</p>
+            <p className="mt-2">利用者は正確な情報を登録し、アカウントを適切に管理してください。アカウントを第三者へ貸与または譲渡することはできません。マイページから退会すると、アカウント、本人の投稿、応募および関連するメッセージが削除され、元に戻すことはできません。</p>
           </section>
           <section>
             <h2 className="text-base font-bold">投稿と参加</h2>
