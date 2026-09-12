@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getGuestId, setGuestId } from "@/lib/guest";
 import { createClient } from "@/lib/supabase/server";
+import { notifyAdmin } from "@/lib/admin-notifications";
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
@@ -18,6 +19,11 @@ export async function POST(request: NextRequest) {
     p_guest_id: guestId,
   });
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  await notifyAdmin({
+    subject: "新しいお問い合わせ",
+    text: `お名前: ${name}\n返信先: ${email}\n\n${message}\n\n管理画面: ${new URL("/", request.url).toString()}`,
+    replyTo: email,
+  });
   const response = NextResponse.json({ ok: true }, { status: 201 });
   if (!user && !currentGuestId) setGuestId(response, guestId);
   return response;

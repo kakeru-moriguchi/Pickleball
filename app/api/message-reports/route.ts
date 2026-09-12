@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getGuestId } from "@/lib/guest";
 import { createClient } from "@/lib/supabase/server";
+import { notifyAdmin } from "@/lib/admin-notifications";
 
 export async function POST(request: NextRequest) {
   const body = (await request.json()) as { messageId?: unknown; reason?: unknown; details?: unknown };
@@ -17,5 +18,9 @@ export async function POST(request: NextRequest) {
     p_guest_id: getGuestId(request),
   });
   if (error) return NextResponse.json({ error: error.message }, { status: 403 });
+  await notifyAdmin({
+    subject: "DMが通報されました",
+    text: `メッセージID: ${messageId}\n理由: ${reason}\n詳細: ${details || "なし"}\n\n管理画面: ${new URL("/", request.url).toString()}`,
+  });
   return NextResponse.json({ ok: true });
 }

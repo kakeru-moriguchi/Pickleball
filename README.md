@@ -22,9 +22,14 @@
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
 SUPABASE_SECRET_KEY=your-secret-key
+RESEND_API_KEY=re_your-api-key
+ADMIN_NOTIFICATION_EMAIL=admin@example.com
+RESEND_FROM_EMAIL=みんなでピックル！！ <notifications@your-domain.example>
 ```
 
 `SUPABASE_SECRET_KEY` は退会処理のサーバーAPIだけで使用します。実値はVercelの環境変数へ保存し、ブラウザへ公開したりGitへコミットしたりしないでください。
+
+管理者メール通知にはResendを使用します。`RESEND_API_KEY`、通知先の`ADMIN_NOTIFICATION_EMAIL`、Resendで認証済みの送信元`RESEND_FROM_EMAIL`をVercelへ設定してください。メール送信に失敗しても、通報・問い合わせはSupabaseへ保存されます。
 
 最初に登録されたユーザーには管理者権限が設定されます。
 
