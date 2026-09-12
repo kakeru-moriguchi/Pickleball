@@ -12,8 +12,6 @@ type ApplicationBody = {
   hasPaddle?: unknown;
   hasNet?: unknown;
   hasBall?: unknown;
-  contactMethod?: unknown;
-  contactValue?: unknown;
 };
 
 type ApplicantRow = {
@@ -24,8 +22,6 @@ type ApplicantRow = {
   has_paddle: boolean;
   has_net: boolean;
   has_ball: boolean;
-  contact_method: string;
-  contact_value: string;
   application_status: "pending" | "approved" | "rejected";
   unread_count: number;
   chat_blocked: boolean;
@@ -44,16 +40,12 @@ export async function POST(request: NextRequest) {
   const applicantName = typeof body.applicantName === "string" ? body.applicantName.trim() : "";
   const level = typeof body.level === "string" ? body.level : "";
   const partySize = Number(body.partySize);
-  const contactMethod = typeof body.contactMethod === "string" ? body.contactMethod : "";
-  const contactValue = typeof body.contactValue === "string" ? body.contactValue.trim() : "";
   if (!type || !postId)
     return NextResponse.json({ error: "対象が正しくありません" }, { status: 400 });
   if (!applicantName || applicantName.length > 80)
     return NextResponse.json({ error: "名前を80文字以内で入力してください" }, { status: 400 });
   if (!Number.isInteger(partySize) || partySize < 1 || partySize > 50)
     return NextResponse.json({ error: "参加人数が正しくありません" }, { status: 400 });
-  if (!contactValue || contactValue.length > 200)
-    return NextResponse.json({ error: "連絡先を200文字以内で入力してください" }, { status: 400 });
 
   const currentGuestId = getGuestId(request);
   const guestId = currentGuestId ?? crypto.randomUUID();
@@ -66,8 +58,10 @@ export async function POST(request: NextRequest) {
     p_has_paddle: body.hasPaddle === true,
     p_has_net: body.hasNet === true,
     p_has_ball: body.hasBall === true,
-    p_contact_method: contactMethod,
-    p_contact_value: contactValue,
+    // The existing RPC parameters are retained for backward-compatible database history.
+    // New applications use the safer in-app conversation instead of collecting contact details.
+    p_contact_method: "その他",
+    p_contact_value: "アプリ内DM",
     p_guest_id: guestId,
   });
   if (error) return NextResponse.json({ error: error.message }, { status: 409 });
@@ -121,8 +115,6 @@ export async function GET(request: NextRequest) {
       hasPaddle: row.has_paddle,
       hasNet: row.has_net,
       hasBall: row.has_ball,
-      contactMethod: row.contact_method,
-      contactValue: row.contact_value,
       status: row.application_status,
       unreadCount: Number(row.unread_count ?? 0),
       chatBlocked: row.chat_blocked,

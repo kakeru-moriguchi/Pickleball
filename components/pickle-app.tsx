@@ -51,8 +51,6 @@ type ParticipationApplication = {
   hasPaddle: boolean;
   hasNet: boolean;
   hasBall: boolean;
-  contactMethod: string;
-  contactValue: string;
 };
 type Applicant = ParticipationApplication & {
   id: string;
@@ -1091,8 +1089,6 @@ function ApplicationDialog({
         hasPaddle: form.get("hasPaddle") === "true",
         hasNet: form.get("hasNet") === "true",
         hasBall: form.get("hasBall") === "true",
-        contactMethod: String(form.get("contactMethod") ?? ""),
-        contactValue: String(form.get("contactValue") ?? ""),
       });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "応募できませんでした");
@@ -1151,20 +1147,8 @@ function ApplicationDialog({
               </label>
             ))}
           </div>
-          <div className="grid gap-4 sm:grid-cols-[9rem_1fr]">
-            <SelectField
-              label="連絡方法"
-              name="contactMethod"
-              options={["メール", "LINE", "Instagram", "電話", "その他"]}
-            />
-            <Field
-              label="連絡先"
-              name="contactValue"
-              placeholder="メールアドレス、LINE IDなど"
-            />
-          </div>
           <p className="rounded-lg bg-zinc-50 px-3 py-2 text-xs leading-5 text-zinc-600">
-            連絡先はこの募集の主催者と管理者だけに表示されます。
+            申込み後の連絡は、アプリ内の「トーク」から行えます。
           </p>
           {error && (
             <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-700">
@@ -1723,10 +1707,6 @@ function ApplicantsDialog({ post, onClose, onChat }: { post: Post | null; onClos
                   <span>ネット：{applicant.hasNet ? "あり" : "なし"}</span>
                   <span>ボール：{applicant.hasBall ? "あり" : "なし"}</span>
                 </div>
-                <p className="mt-3 rounded-md bg-zinc-50 px-3 py-2 text-sm">
-                  <span className="font-bold">{applicant.contactMethod}：</span>
-                  <span className="break-all">{applicant.contactValue}</span>
-                </p>
                 <Button onClick={() => onChat({ participationId: applicant.id, title: post?.title ?? "応募者とのトーク", counterpart: applicant.applicantName, blocked: applicant.chatBlocked, blockedByMe: applicant.blockedByMe })} variant="outline" size="sm" className="mt-3">
                   <MessageCircle className="size-4" /> トーク
                   {!!applicant.unreadCount && <span className="rounded-full bg-primary px-1.5 text-[10px] text-white">{applicant.unreadCount}</span>}
