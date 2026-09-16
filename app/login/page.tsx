@@ -61,9 +61,9 @@ export default function LoginPage() {
   }
   return (
     <main className="grid min-h-screen place-items-center bg-[#fbfaf8] px-4 py-8">
-      <section className="w-full max-w-md border-y border-zinc-200 bg-white px-5 py-7 md:border md:p-8">
+      <section className="w-full max-w-md rounded-xl border border-zinc-200 bg-white p-6 md:p-8">
         <Link href="/" className="font-black">
-          Pickle Link
+          みんなでピックル！！
         </Link>
         <h1 className="mt-8 text-2xl font-black">
           {mode === "login" ? "ログイン" : "アカウントを作成"}

@@ -32,25 +32,13 @@ export type CommunityPost = {
 };
 
 // UI確認専用。Supabaseには保存せず、development条件のフォールバックでのみ使用します。
-function sampleDate(daysFromToday: number) {
-  const date = new Date();
-  date.setHours(12, 0, 0, 0);
-  date.setDate(date.getDate() + daysFromToday);
-  return date.toLocaleDateString("sv-SE");
-}
-
-function nextSaturday() {
-  const day = new Date().getDay();
-  return sampleDate(((6 - day + 7) % 7) || 7);
-}
-
 export const developmentSamplePosts: CommunityPost[] = [
   {
     id: "demo-practice-night",
     type: "practice",
     author_id: "demo-user-1",
     title: "土曜ナイター練習会",
-    held_on: nextSaturday(),
+    held_on: "2026-09-12",
     start_time: "19:00",
     end_time: "21:00",
     venue: "宮崎市総合体育館",
@@ -67,7 +55,7 @@ export const developmentSamplePosts: CommunityPost[] = [
     deadline: "",
     application_method: "",
     viewer_joined: 0,
-    created_at: new Date().toISOString(),
+    created_at: "2026-09-07T09:00:00Z",
     is_demo: true,
   },
   {
@@ -75,7 +63,7 @@ export const developmentSamplePosts: CommunityPost[] = [
     type: "practice",
     author_id: "demo-user-2",
     title: "初心者歓迎 ゆる練習",
-    held_on: sampleDate(4),
+    held_on: "2026-09-14",
     start_time: "10:00",
     end_time: "12:00",
     venue: "清武体育館",
@@ -92,7 +80,7 @@ export const developmentSamplePosts: CommunityPost[] = [
     deadline: "",
     application_method: "",
     viewer_joined: 0,
-    created_at: new Date(Date.now() - 86400000).toISOString(),
+    created_at: "2026-09-06T11:00:00Z",
     is_demo: true,
   },
   {
@@ -100,7 +88,7 @@ export const developmentSamplePosts: CommunityPost[] = [
     type: "member",
     author_id: "demo-user-3",
     title: "10月のミックス大会、一緒に出てくれる方探してます！",
-    held_on: sampleDate(18),
+    held_on: "2026-10-18",
     start_time: "",
     end_time: "",
     venue: "宮崎県体育館",
@@ -114,10 +102,10 @@ export const developmentSamplePosts: CommunityPost[] = [
     status: "open",
     participant_count: 0,
     secondary_title: "宮崎オータムカップ",
-    deadline: sampleDate(14),
+    deadline: "2026-09-30",
     application_method: "",
     viewer_joined: 0,
-    created_at: new Date(Date.now() - 3600000).toISOString(),
+    created_at: "2026-09-07T12:00:00Z",
     is_demo: true,
   },
   {
@@ -125,7 +113,7 @@ export const developmentSamplePosts: CommunityPost[] = [
     type: "event",
     author_id: "demo-user-4",
     title: "みやざきピックルボール交流会",
-    held_on: sampleDate(7),
+    held_on: "2026-09-20",
     start_time: "13:00",
     end_time: "16:00",
     venue: "生目の杜運動公園体育館",
@@ -142,7 +130,7 @@ export const developmentSamplePosts: CommunityPost[] = [
     deadline: "",
     application_method: "詳細ページの参加ボタンからお申し込みください。",
     viewer_joined: 0,
-    created_at: new Date(Date.now() - 172800000).toISOString(),
+    created_at: "2026-09-05T08:00:00Z",
     is_demo: true,
   },
 ];

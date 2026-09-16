@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Pickle Link",
-    short_name: "Pickle Link",
+    name: "みんなでピックル！！",
+    short_name: "みんなでピックル",
     description: "ピックルボール仲間と練習会・大会・イベントを見つけるコミュニティアプリ",
     start_url: "/",
     display: "standalone",
