@@ -5,17 +5,14 @@ import {
   CalendarDays,
   ChevronRight,
   CirclePlus,
-  Clock3,
   Dumbbell,
   Home,
   MapPin,
-  MapPinned,
   MessageCircle,
   Search,
   Trophy,
   UserRound,
   UsersRound,
-  WalletCards,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -28,7 +25,6 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
-import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
 import { developmentSamplePosts, type CommunityPost } from "@/lib/community-post";
 import { createClient as createBrowserClient } from "@/lib/supabase/client";
@@ -119,6 +115,17 @@ function remaining(post: Post) {
   return Math.max(0, post.capacity - post.participant_count);
 }
 
+function relativeDay(value: string) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const day = new Date(`${value}T00:00:00`);
+  const difference = Math.round((day.getTime() - today.getTime()) / 86400000);
+  if (difference === 0) return "今日";
+  if (difference === 1) return "明日";
+  if (difference > 1 && difference <= 6 - today.getDay()) return "今週";
+  return "";
+}
+
 function filterDevelopmentPosts(
   screen: Screen,
   q: string,
@@ -160,6 +167,7 @@ export function PickleApp() {
   const [q, setQ] = useState("");
   const [filters, setFilters] = useState({ prefecture: "", date: "", level: "", category: "" });
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [notice, setNotice] = useState("");
   const [me, setMe] = useState<Me>({ signedIn: false });
   const [mine, setMine] = useState<Post[]>([]);
@@ -168,6 +176,7 @@ export function PickleApp() {
 
   const loadPosts = useCallback(async () => {
     setLoading(true);
+    setLoadError("");
     const params = new URLSearchParams();
     if (screen === "practice" || screen === "member" || screen === "event")
       params.set("type", screen);
@@ -180,12 +189,13 @@ export function PickleApp() {
         nextPosts = filterDevelopmentPosts(screen, q, filters);
       }
       setPosts(nextPosts);
-    } catch (error) {
+    } catch {
       if (process.env.NODE_ENV === "development") {
         setPosts(filterDevelopmentPosts(screen, q, filters));
         setNotice("");
       } else {
-        setNotice(error instanceof Error ? error.message : "読み込みに失敗しました");
+        setPosts([]);
+        setLoadError("募集を読み込めませんでした。通信状態を確認して再試行してください。");
       }
     } finally {
       setLoading(false);
@@ -364,14 +374,14 @@ export function PickleApp() {
 
   return (
     <div className="min-h-screen pb-28 md:pb-0">
-      <header className="sticky top-0 z-30 border-b border-zinc-200 bg-[#fbfaf8]/95 px-4 backdrop-blur-md md:px-8">
-        <div className="mx-auto flex h-16 max-w-5xl items-center justify-between gap-6">
+      <header className="site-header sticky top-0 z-30 border-b border-zinc-200 bg-[#fffefa]/95 px-4 backdrop-blur-md md:px-8">
+        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-6 md:h-16">
           <button
             onClick={() => go("home")}
             className="shrink-0"
             aria-label="ホームへ"
           >
-            <span className="text-lg font-extrabold tracking-tight">みんなでピックル！！</span>
+            <span className="brand-name text-[1.15rem] font-black tracking-tight">Pickle Link<span className="ml-1 text-primary">.</span></span>
           </button>
           <div className="hidden flex-1 items-center justify-center gap-1 md:flex">
             {nav.map(({ screen: target, label }) => (
@@ -402,7 +412,8 @@ export function PickleApp() {
         </button>
       )}
 
-      <main className="mx-auto max-w-5xl px-4 py-5 md:px-8 md:py-8">
+      <main className="mx-auto max-w-6xl px-4 py-5 md:px-8 md:py-8">
+        {loadError && <div role="alert" className="mb-5 flex items-center justify-between gap-4 border-l-[3px] border-primary bg-[#fff1ed] px-4 py-3 text-sm text-zinc-800"><span>{loadError}</span><button onClick={() => void loadPosts()} className="shrink-0 font-bold text-primary underline">再試行</button></div>}
         {screen === "home" && (
           <HomeScreen
             posts={posts}
@@ -465,7 +476,7 @@ export function PickleApp() {
 
       <nav
         aria-label="メインナビゲーション"
-        className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-zinc-200 bg-white/97 px-1 pb-[max(.45rem,env(safe-area-inset-bottom))] pt-1.5 backdrop-blur-md md:hidden"
+        className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-zinc-200 bg-[#fffefa]/98 px-1 pb-[max(.45rem,env(safe-area-inset-bottom))] pt-1.5 md:hidden"
       >
         {nav.map(({ screen: target, label, icon: Icon }) => (
           <button
@@ -483,7 +494,7 @@ export function PickleApp() {
       {screen !== "create" && screen !== "admin" && (
         <Button
           onClick={() => openCreate()}
-          className="fixed bottom-[5.5rem] right-4 z-30 h-12 rounded-full px-5 font-bold shadow-lg shadow-black/15 md:hidden"
+          className="fixed bottom-[5.5rem] right-4 z-30 h-12 rounded-full px-5 font-bold shadow-md shadow-black/10 md:hidden"
         >
           <CirclePlus className="size-5" />
           募集する
@@ -525,7 +536,7 @@ export function PickleApp() {
         }}
       />
       <ChatDialog target={chatTarget} signedIn={me.signedIn} onClose={() => setChatTarget(null)} />
-      <footer className="mx-auto mt-10 max-w-5xl border-t border-zinc-200 px-4 py-8 text-center text-xs text-zinc-500 md:px-8">
+      <footer className="mx-auto mt-10 max-w-6xl border-t border-zinc-200 px-4 py-8 text-center text-xs text-zinc-500 md:px-8">
         <div className="flex justify-center gap-5">
           <a href="/contact" className="hover:text-primary">お問い合わせ</a>
           <a href="/terms" className="hover:text-primary">利用規約</a>
@@ -583,45 +594,42 @@ function HomeScreen({
   region: string;
   onRegionChange: (region: string) => void;
 }) {
+  const today = new Date().toLocaleDateString("sv-SE");
   const regionalPosts = posts.filter((post) => post.prefecture === region);
-  const groups = [
-    { type: "practice" as PostType, title: "今週参加できる練習会", link: "練習会をもっと見る" },
-    { type: "member" as PostType, title: "大会メンバーを探している人", link: "メンバー募集を見る" },
-    { type: "event" as PostType, title: "近くの大会・イベント", link: "イベント一覧を見る" },
-  ];
+  const upcoming = regionalPosts.filter((post) => post.status === "open" && post.held_on >= today);
+  const practices = upcoming.filter((post) => post.type === "practice").slice(0, 4);
+  const members = upcoming.filter((post) => post.type === "member").slice(0, 2);
+  const events = upcoming.filter((post) => post.type === "event").slice(0, 3);
   return (
     <>
-      <section className="border-b border-zinc-200 pb-5">
-        <label className="inline-flex items-center gap-1.5 text-sm font-bold text-zinc-600">
-          <MapPinned className="size-4 text-primary" />
+      <section className="home-intro border-b border-zinc-200 pb-5 md:pb-7">
+        <label className="inline-flex items-center gap-1 text-xs font-bold text-zinc-600">
+          <MapPin className="size-3.5 text-primary" aria-hidden="true" />
           <NativeSelect
             aria-label="現在の地域"
             value={region}
             onChange={(event) => onRegionChange(event.target.value)}
-            className="h-8 min-w-28 border-0 bg-transparent px-1 font-bold text-zinc-700 shadow-none"
+            className="h-8 min-w-28 border-0 bg-transparent px-1 text-xs font-bold text-zinc-700 shadow-none"
           >
             {prefectures.map((prefecture) => (
               <NativeSelectOption key={prefecture}>{prefecture}</NativeSelectOption>
             ))}
           </NativeSelect>
-          <span className="text-xs font-medium text-primary">変更</span>
+          <span className="font-medium text-zinc-500">エリア変更</span>
         </label>
-        <h1 className="mt-3 text-[1.65rem] font-black leading-tight tracking-tight text-zinc-900 md:text-3xl">
+        <h1 className="mt-2 text-[1.3rem] font-black leading-tight tracking-tight text-zinc-900 sm:text-[1.6rem] md:text-[2rem]">
           {region.replace(/[都道府県]$/, "")}でピックルボールしよう。
         </h1>
-        <p className="mt-1.5 text-sm leading-6 text-zinc-600">
-          近くの練習会と、一緒にプレーする仲間が見つかります。
+        <p className="mt-1 text-[13px] leading-6 text-zinc-600">
+          今日の一打から、大会のパートナー探しまで。
         </p>
-        <div className="mt-4 grid grid-cols-2 gap-2 sm:max-w-md">
-          <Button onClick={() => onMore("practice")} className="h-10 rounded-lg font-bold">
+        <div className="mt-3 flex gap-2 sm:max-w-md">
+          <Button onClick={() => onMore("practice")} className="h-10 flex-1 rounded-md font-bold">
             練習会を探す
           </Button>
-          <Button onClick={() => onMore("member")} variant="outline" className="h-10 rounded-lg border-zinc-300 font-bold">
+          <Button onClick={() => onMore("member")} variant="outline" className="h-10 flex-1 rounded-md border-zinc-300 font-bold">
             メンバーを探す
           </Button>
-        </div>
-        <div className="mt-4 max-w-xl">
-          <SearchBox q={q} setQ={setQ} onSearch={onSearch} />
         </div>
       </section>
 
@@ -631,37 +639,58 @@ function HomeScreen({
         </p>
       )}
 
-      {groups.map((group, index) => (
-        <section key={group.type} className={index === 0 ? "mt-6" : "mt-9"}>
-          <div className="mb-3 flex items-end justify-between gap-4">
-            <h2 className="text-lg font-black tracking-tight md:text-xl">{group.title}</h2>
-            <button onClick={() => onMore(group.type)} className="shrink-0 text-xs font-bold text-primary">
-              {group.link} <span aria-hidden>›</span>
-            </button>
-          </div>
-          <CardGrid
-            posts={regionalPosts.filter((p) => p.type === group.type).slice(0, 3)}
-            loading={loading}
-            type={group.type}
-            onOpen={onOpen}
-            onCreate={() => onCreate(group.type)}
-          />
-        </section>
-      ))}
-      <section className="mt-9 border-t border-zinc-200 pt-7">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-lg font-black">新着の募集</h2>
+      <div className="home-layout md:grid md:grid-cols-[minmax(0,1.6fr)_minmax(280px,1fr)] md:gap-10">
+        <div className="min-w-0">
+          <section className="mt-5" aria-labelledby="upcoming-heading">
+            <SectionHeading id="upcoming-heading" eyebrow="PLAY THIS WEEK" title="近日の練習会" count={practices.length} onMore={() => onMore("practice")} />
+            <p className="mb-3 text-xs text-zinc-500">日時を見て、行けそうな練習会を探しましょう。</p>
+            <PostList posts={practices} loading={loading} type="practice" onOpen={onOpen} onCreate={() => onCreate("practice")} />
+          </section>
+          <section className="mt-8 border-t border-zinc-200 pt-6" aria-labelledby="member-heading">
+            <SectionHeading id="member-heading" eyebrow="FIND A PARTNER" title="一緒に大会へ出る仲間" onMore={() => onMore("member")} />
+            <PostList posts={members} loading={loading} type="member" onOpen={onOpen} onCreate={() => onCreate("member")} />
+          </section>
         </div>
-        <CardGrid
-          posts={[...regionalPosts].sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 3)}
-          loading={loading}
-          type="practice"
-          onOpen={onOpen}
-          onCreate={() => onCreate("practice")}
-        />
+        <aside className="min-w-0 md:border-l md:border-zinc-200 md:pl-8">
+          <section className="mt-8 md:mt-5" aria-labelledby="events-heading">
+            <SectionHeading id="events-heading" eyebrow="LOCAL EVENTS" title="近くの大会・イベント" onMore={() => onMore("event")} />
+            <PostList posts={events} loading={loading} type="event" onOpen={onOpen} onCreate={() => onCreate("event")} />
+          </section>
+          <section className="mt-8 border-t border-zinc-200 pt-6" aria-labelledby="new-heading">
+            <SectionHeading id="new-heading" eyebrow="RECENT POSTS" title="新着の募集" />
+            {loading ? <p className="text-sm text-zinc-500">読み込み中…</p> : regionalPosts.length ? (
+              <div className="divide-y divide-zinc-200 border-t border-zinc-200">
+                {[...regionalPosts].sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 4).map((post) => (
+                  <button key={`${post.type}-${post.id}`} onClick={() => onOpen(post)} className="flex w-full items-start gap-3 py-3 text-left hover:text-primary">
+                    <span className="shrink-0 pt-0.5 text-[11px] font-bold text-zinc-500">{labels[post.type]}</span>
+                    <span className="min-w-0 flex-1 text-sm font-bold leading-5">{post.title}</span>
+                    <ChevronRight className="mt-1 size-3.5 shrink-0 text-zinc-400" />
+                  </button>
+                ))}
+              </div>
+            ) : <p className="text-sm text-zinc-500">新着の募集はまだありません。</p>}
+          </section>
+          <div className="mt-8 border-t border-zinc-200 pt-5">
+            <SearchBox q={q} setQ={setQ} onSearch={onSearch} />
+          </div>
+        </aside>
+      </div>
+      <section className="mt-9 flex items-center justify-between gap-4 border-t border-zinc-200 py-6">
+        <div>
+          <h2 className="font-black">仲間を集めてプレーしませんか？</h2>
+          <p className="mt-1 text-xs text-zinc-600">練習会や大会メンバーの募集を掲載できます。</p>
+        </div>
+        <Button onClick={() => onCreate("practice")} variant="outline" className="hidden shrink-0 rounded-md border-primary text-primary md:flex">募集する</Button>
       </section>
     </>
   );
+}
+
+function SectionHeading({ id, eyebrow, title, count, onMore }: { id: string; eyebrow: string; title: string; count?: number; onMore?: () => void }) {
+  return <div className="mb-3 flex items-end justify-between gap-2">
+    <div><p className="text-[10px] font-black tracking-[.13em] text-primary">{eyebrow}</p><h2 id={id} className="mt-0.5 text-[1.15rem] font-black tracking-tight text-zinc-900 md:text-xl">{title}{count !== undefined && <span className="ml-2 text-xs font-medium text-zinc-500">{count}件</span>}</h2></div>
+    {onMore && <button onClick={onMore} className="shrink-0 pb-0.5 text-xs font-bold text-primary hover:underline">一覧を見る <span aria-hidden="true">→</span></button>}
+  </div>;
 }
 
 function ListScreen({
@@ -689,12 +718,12 @@ function ListScreen({
 }) {
   return (
     <>
-      <div className="flex items-end justify-between border-b border-zinc-200 pb-4">
+      <div className="flex items-end justify-between border-b border-zinc-300 pb-4">
         <div>
           <p className="text-xs font-bold text-primary">
             {type === "practice" ? "一緒に打てる場所を探す" : type === "member" ? "一緒に大会へ出る仲間を探す" : "近くで開催される予定"}
           </p>
-          <h1 className="mt-1 text-2xl font-black tracking-tight">{labels[type]}</h1>
+          <h1 className="mt-1 text-[1.55rem] font-black tracking-tight">{labels[type]}</h1>
         </div>
         <Button onClick={onCreate} variant="outline" className="hidden rounded-lg md:flex">
           <CirclePlus />
@@ -704,11 +733,12 @@ function ListScreen({
       <div className="mt-5">
         <SearchBox q={q} setQ={setQ} onSearch={onSearch} />
       </div>
-      <div className="mt-3 flex gap-2 overflow-x-auto rounded-xl border border-zinc-200 bg-white p-2">
+      <div className="mt-3 flex gap-2 overflow-x-auto border-b border-zinc-200 pb-3">
         <NativeSelect
+          aria-label="都道府県で絞り込み"
           value={filters.prefecture}
           onChange={(e) => setFilters({ ...filters, prefecture: e.target.value })}
-          className="min-w-32"
+          className="min-w-32 shrink-0"
         >
           <NativeSelectOption value="">都道府県</NativeSelectOption>
           {prefectures.map((x) => (
@@ -720,13 +750,14 @@ function ListScreen({
           aria-label="開催日"
           value={filters.date}
           onChange={(e) => setFilters({ ...filters, date: e.target.value })}
-          className="w-40"
+          className="w-40 shrink-0"
         />
         {type !== "event" && (
           <NativeSelect
+            aria-label="レベルで絞り込み"
             value={filters.level}
             onChange={(e) => setFilters({ ...filters, level: e.target.value })}
-            className="min-w-32"
+            className="min-w-32 shrink-0"
           >
             <NativeSelectOption value="">レベル</NativeSelectOption>
             {levelOptions.map((x) => (
@@ -736,9 +767,10 @@ function ListScreen({
         )}
         {type !== "practice" && (
           <NativeSelect
+            aria-label="カテゴリーで絞り込み"
             value={filters.category}
             onChange={(e) => setFilters({ ...filters, category: e.target.value })}
-            className="min-w-32"
+            className="min-w-32 shrink-0"
           >
             <NativeSelectOption value="">カテゴリー</NativeSelectOption>
             {(type === "event" ? eventOptions : categoryOptions).map((x) => (
@@ -750,12 +782,12 @@ function ListScreen({
       <p className="my-4 text-sm font-bold text-zinc-500">
         {loading ? "検索中…" : `${posts.length}件の募集`}
       </p>
-      <CardGrid posts={posts} loading={loading} type={type} onOpen={onOpen} onCreate={onCreate} />
+      <PostList posts={posts} loading={loading} type={type} onOpen={onOpen} onCreate={onCreate} />
     </>
   );
 }
 
-function CardGrid({
+function PostList({
   posts,
   loading,
   type,
@@ -770,15 +802,15 @@ function CardGrid({
 }) {
   if (loading)
     return (
-      <div className="grid gap-3 md:grid-cols-2">
+      <div className="divide-y divide-zinc-200 border-y border-zinc-200">
         {[1, 2, 3].map((x) => (
-          <div key={x} className="h-40 animate-pulse rounded-xl border border-zinc-200 bg-white" />
+          <div key={x} className="h-28 animate-pulse bg-zinc-100/70" />
         ))}
       </div>
     );
   if (!posts.length)
     return (
-      <div className="rounded-xl border border-dashed border-zinc-300 bg-white px-5 py-7 text-left">
+      <div className="border-y border-zinc-200 bg-[#fffefa] px-4 py-7 text-left">
         <p className="font-bold">まだ募集はありません</p>
         <p className="mt-1 text-sm text-zinc-500">この地域の最初の募集を投稿してみませんか。</p>
         <Button onClick={onCreate} variant="outline" className="mt-4 h-9 rounded-lg">
@@ -787,7 +819,7 @@ function CardGrid({
       </div>
     );
   return (
-    <div className="grid gap-3 md:grid-cols-2">
+    <div className="divide-y divide-zinc-200 border-y border-zinc-200">
       {posts.map((post) => (
         <PostCard key={`${post.type}-${post.id}`} post={post} onOpen={onOpen} />
       ))}
@@ -807,38 +839,32 @@ function PracticePostCard({ post, onOpen }: { post: Post; onOpen: (p: Post) => v
   return (
     <button
       onClick={() => onOpen(post)}
-      className="group flex w-full gap-4 rounded-xl border border-zinc-200 bg-white p-4 text-left transition hover:border-pink-300 hover:bg-pink-50/20"
+      className="group flex w-full gap-3 bg-transparent py-4 text-left transition hover:bg-[#fff5f3] sm:gap-5 sm:px-2"
     >
-      <div className="flex h-16 w-14 shrink-0 flex-col items-center justify-center rounded-lg bg-pink-50 text-primary">
-        <span className="text-[10px] font-bold">{date.getMonth() + 1}月</span>
-        <strong className="text-2xl leading-none">{date.getDate()}</strong>
-        <span className="mt-0.5 text-[10px]">{["日", "月", "火", "水", "木", "金", "土"][date.getDay()]}</span>
+      <div className="flex w-13 shrink-0 flex-col items-center border-r border-zinc-200 pr-3 text-zinc-800 sm:w-17 sm:pr-4">
+        <span className="text-[10px] font-bold text-zinc-500">{date.getMonth() + 1}月</span>
+        <strong className="text-[1.75rem] font-black leading-none tabular-nums">{date.getDate()}</strong>
+        <span className="mt-0.5 text-[10px] font-bold text-zinc-500">{["日", "月", "火", "水", "木", "金", "土"][date.getDay()]}曜</span>
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-2">
           <h3 className="line-clamp-2 font-black leading-snug text-zinc-900">{post.title}</h3>
-          <ChevronRight className="mt-0.5 size-4 shrink-0 text-zinc-300 transition group-hover:translate-x-0.5" />
+          <ChevronRight className="mt-0.5 size-4 shrink-0 text-zinc-400 transition group-hover:translate-x-0.5" />
         </div>
-        <p className="mt-2 text-sm font-semibold text-zinc-700">
-          {formatTime(post.start_time)}〜{formatTime(post.end_time)}
+        <p className="mt-1.5 text-[13px] font-bold text-zinc-700">
+          {relativeDay(post.held_on) && <span className="mr-2 text-primary">{relativeDay(post.held_on)}</span>}{formatTime(post.start_time)}〜{formatTime(post.end_time)}
         </p>
-        <p className="mt-1 flex items-center gap-1.5 truncate text-sm text-zinc-600">
-          <MapPin className="size-3.5 shrink-0 text-zinc-400" />
+        <p className="mt-1 flex items-center gap-1 truncate text-[13px] text-zinc-600">
+          <MapPin className="size-3.5 shrink-0 text-zinc-500" aria-hidden="true" />
           {post.venue}
         </p>
-        <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-          <span className="rounded-md bg-zinc-100 px-2 py-1 font-semibold text-zinc-700">{post.level || "レベル不問"}</span>
+        <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px]">
+          <span className="border border-zinc-200 px-1.5 py-0.5 font-semibold text-zinc-700">{post.level || "レベル不問"}</span>
           <span className={`font-black ${full ? "text-zinc-500" : "text-primary"}`}>
             {full ? "満員・終了" : `あと${remaining(post)}名`}
           </span>
-          <span className="ml-auto text-zinc-500">主催：{post.organizer}さん</span>
-        </div>
-        <div className="mt-3">
-          <div className="mb-1 flex justify-between text-[10px] text-zinc-400">
-            <span>{post.participant_count}名参加</span>
-            <span>定員{post.capacity}名</span>
-          </div>
-          <Progress value={Math.min(100, (post.participant_count / post.capacity) * 100)} />
+          {post.viewer_joined ? <span className="font-bold text-emerald-700">参加申込済み</span> : null}
+          <span className="ml-auto text-zinc-500">{post.participant_count}/{post.capacity}名 · {post.organizer}さん</span>
         </div>
       </div>
     </button>
@@ -847,24 +873,25 @@ function PracticePostCard({ post, onOpen }: { post: Post; onOpen: (p: Post) => v
 
 function MemberPostCard({ post, onOpen }: { post: Post; onOpen: (p: Post) => void }) {
   return (
-    <article className="rounded-xl border border-zinc-200 bg-white p-4">
+    <article className="py-4 sm:px-2">
       <div className="flex items-center gap-3">
-        <span className="grid size-10 shrink-0 place-items-center rounded-full bg-[#f4e7e1] font-black text-[#a44d55]">
+        <span className="grid size-9 shrink-0 place-items-center rounded-full bg-[#f4e7e1] font-black text-[#9d414d]">
           {post.organizer.slice(0, 1)}
         </span>
         <div className="min-w-0">
           <p className="font-bold text-zinc-900">{post.organizer}さん</p>
-          <p className="truncate text-xs text-zinc-500">{post.secondary_title || formatDate(post.held_on)}</p>
+          <p className="truncate text-xs text-zinc-500">{post.secondary_title || "大会パートナー募集"} · {formatDate(post.held_on)}</p>
         </div>
       </div>
-      <button onClick={() => onOpen(post)} className="mt-3 w-full text-left">
-        <p className="text-[1.05rem] font-bold leading-7 text-zinc-800">「{post.title}」</p>
-        <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold text-zinc-600">
-          <span className="rounded-md bg-pink-50 px-2 py-1 text-primary">{post.category}</span>
-          <span className="rounded-md bg-zinc-100 px-2 py-1">{post.level}</span>
-          <span className="rounded-md bg-zinc-100 px-2 py-1">{post.prefecture.replace(/[都道府県]$/, "")}</span>
+      <button onClick={() => onOpen(post)} className="mt-2 w-full text-left hover:text-primary">
+        <p className="text-[1rem] font-bold leading-6 text-zinc-800">「{post.title}」</p>
+        <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs font-semibold text-zinc-600">
+          <span className="text-primary">{post.category}</span>
+          <span>{post.level}</span>
+          <span>{post.venue}</span>
+          <span>あと{remaining(post)}名</span>
         </div>
-        <span className="mt-4 inline-flex items-center gap-1 text-sm font-bold text-primary">
+        <span className="mt-2 inline-flex items-center gap-1 text-xs font-bold text-primary">
           詳細を見る <ChevronRight className="size-4" />
         </span>
       </button>
@@ -877,22 +904,21 @@ function EventPostCard({ post, onOpen }: { post: Post; onOpen: (p: Post) => void
   return (
     <button
       onClick={() => onOpen(post)}
-      className="group flex w-full overflow-hidden rounded-xl border border-zinc-200 bg-white text-left transition hover:border-[#d86d75]"
+      className="group flex w-full overflow-hidden py-3 text-left transition hover:bg-[#fff5f3] sm:px-2"
     >
-      <div className="flex w-[4.5rem] shrink-0 flex-col items-center justify-center bg-[#d86d75] px-2 text-white">
-        <span className="text-xs font-bold">{date.getMonth() + 1}月</span>
-        <strong className="text-3xl leading-none">{date.getDate()}</strong>
-        <span className="mt-1 text-[10px]">{["日", "月", "火", "水", "木", "金", "土"][date.getDay()]}曜日</span>
+      <div className="flex w-14 shrink-0 flex-col items-center justify-center border-l-[3px] border-primary bg-[#f9eeeb] px-2 text-zinc-800">
+        <span className="text-[10px] font-bold">{date.getMonth() + 1}月</span>
+        <strong className="text-2xl font-black leading-none">{date.getDate()}</strong>
+        <span className="mt-1 text-[10px]">{["日", "月", "火", "水", "木", "金", "土"][date.getDay()]}曜</span>
       </div>
-      <div className="min-w-0 flex-1 p-4">
+      <div className="min-w-0 flex-1 px-3 py-1">
         <div className="flex items-center justify-between gap-2">
           <span className="text-xs font-black text-primary">{post.category || "イベント"}</span>
           <ChevronRight className="size-4 shrink-0 text-zinc-300 transition group-hover:translate-x-0.5" />
         </div>
         <h3 className="mt-1 line-clamp-2 font-black leading-snug text-zinc-900">{post.title}</h3>
-        <p className="mt-2 text-sm text-zinc-600">{formatTime(post.start_time)}〜{formatTime(post.end_time)}</p>
-        <p className="mt-1 truncate text-sm text-zinc-500">{post.venue}</p>
-        <p className="mt-2 text-xs text-zinc-400">主催：{post.organizer}</p>
+        <p className="mt-1 text-xs text-zinc-600">{formatTime(post.start_time)}〜{formatTime(post.end_time)} · {post.venue}</p>
+        <p className="mt-1 text-[11px] text-zinc-500">主催：{post.organizer}</p>
       </div>
     </button>
   );
@@ -934,25 +960,11 @@ function DetailDialog({
             {post.secondary_title || `${post.organizer}さんの募集`}
           </DialogDescription>
         </DialogHeader>
-        <div className="grid grid-cols-2 gap-3 rounded-lg border border-zinc-200 bg-[#fbfaf8] p-4 text-sm">
-          <p>
-            <CalendarDays className="mb-1 size-4 text-primary" />
-            {formatDate(post.held_on)}
-          </p>
-          <p>
-            <Clock3 className="mb-1 size-4 text-primary" />
-            {post.start_time ? `${formatTime(post.start_time)}〜${formatTime(post.end_time)}` : "時間は主催者に確認"}
-          </p>
-          <p>
-            <MapPin className="mb-1 size-4 text-primary" />
-            {post.prefecture}
-            <br />
-            {post.venue}
-          </p>
-          <p>
-            <WalletCards className="mb-1 size-4 text-primary" />
-            {post.fee ? `${post.fee.toLocaleString()}円` : "無料・要確認"}
-          </p>
+        <div className="divide-y divide-zinc-200 border-y border-zinc-200 text-sm">
+          <div className="flex items-baseline gap-4 py-3"><span className="w-12 shrink-0 text-xs font-bold text-zinc-500">日時</span><strong className="font-black">{formatDate(post.held_on)} <span className="ml-1 text-primary">{post.start_time ? `${formatTime(post.start_time)}〜${formatTime(post.end_time)}` : "時間は主催者に確認"}</span></strong></div>
+          <div className="flex gap-4 py-3"><span className="w-12 shrink-0 text-xs font-bold text-zinc-500">場所</span><span className="font-semibold">{post.prefecture} · {post.venue}</span></div>
+          <div className="flex flex-wrap gap-x-4 gap-y-1 py-3"><span className="w-12 shrink-0 text-xs font-bold text-zinc-500">募集</span><span className="font-semibold">{post.level || post.category || "レベル不問"}</span><span className={full ? "font-bold text-zinc-500" : "font-black text-primary"}>{full ? "満員・終了" : `あと${remaining(post)}名`}</span><span className="text-zinc-500">{post.participant_count}/{post.capacity}名</span></div>
+          <div className="flex gap-4 py-3"><span className="w-12 shrink-0 text-xs font-bold text-zinc-500">費用</span><span>{post.fee ? `${post.fee.toLocaleString()}円` : "無料・要確認"}</span></div>
         </div>
         <div>
           <h4 className="font-black">募集内容</h4>
@@ -1208,7 +1220,7 @@ function CreateScreen({
         </button>
         <h1 className="mt-5 text-2xl font-black">何を募集しますか？</h1>
         <p className="mt-2 text-muted-foreground">投稿したい内容を選んでください。</p>
-        <div className="mt-6 grid gap-3 md:grid-cols-3">
+        <div className="mt-6 divide-y divide-zinc-200 border-y border-zinc-200">
           {(
             [
               {
@@ -1234,16 +1246,16 @@ function CreateScreen({
             <button
               key={item.type}
               onClick={() => setType(item.type)}
-              className="group flex items-center gap-4 rounded-xl border border-zinc-200 bg-white p-4 text-left transition hover:border-pink-300 hover:bg-pink-50/20 md:block"
+              className="group flex w-full items-center gap-4 px-1 py-5 text-left transition hover:bg-[#fff5f3]"
             >
-              <span className="grid size-11 shrink-0 place-items-center rounded-lg bg-pink-50 text-primary">
+              <span className="grid size-10 shrink-0 place-items-center bg-[#f7ebe8] text-primary">
                 <item.icon className="size-5" />
               </span>
-              <div className="min-w-0 flex-1 md:mt-4">
+              <div className="min-w-0 flex-1">
                 <h2 className="font-black">{item.title}</h2>
                 <p className="mt-1 text-sm text-zinc-500">{item.text}</p>
               </div>
-              <ChevronRight className="size-4 text-zinc-300 md:hidden" />
+              <ChevronRight className="size-4 text-zinc-400" />
             </button>
           ))}
         </div>
@@ -1288,7 +1300,7 @@ function CreateScreen({
       </div>
       <form
         onSubmit={submit}
-        className="mt-6 space-y-6 rounded-xl border border-zinc-200 bg-white p-5 md:p-8"
+        className="mt-6 space-y-6 border-y border-zinc-200 bg-white px-4 py-6 md:border md:p-8"
       >
         {type === "member" && (
           <Field
@@ -1546,13 +1558,15 @@ function MyPage({
     );
   return (
     <>
-      <div className="rounded-xl border border-zinc-200 bg-white p-5">
+      <h1 className="text-[1.5rem] font-black">マイページ</h1>
+      <JoinedPlans posts={joined} onOpen={onOpen} onChat={onChat} />
+      <div className="mt-8 border-y border-zinc-200 py-5">
         <div className="flex items-center gap-4">
-          <span className="grid size-16 place-items-center rounded-full bg-primary text-2xl font-black text-white">
+          <span className="grid size-12 place-items-center rounded-full bg-[#f4e7e1] text-lg font-black text-[#9d414d]">
             {me.user?.display_name?.slice(0, 1)}
           </span>
           <div>
-            <h1 className="text-2xl font-black">{me.user?.display_name}</h1>
+            <h2 className="text-lg font-black">{me.user?.display_name}</h2>
             <p className="text-sm text-muted-foreground">
               {me.user?.prefecture || "地域未設定"}・{me.user?.level || "レベル未設定"}
             </p>
@@ -1577,9 +1591,9 @@ function MyPage({
       <section className="mt-8">
         <h2 className="mb-4 text-xl font-black">自分が投稿した募集</h2>
         {mine.length ? (
-          <div className="space-y-3">
+          <div className="divide-y divide-zinc-200 border-y border-zinc-200">
             {mine.map((post) => (
-              <div key={post.id} className="rounded-xl border border-zinc-200 bg-white p-4">
+              <div key={post.id} className="py-4">
                 <button onClick={() => onOpen(post)} className="w-full text-left">
                   <Badge variant="secondary">{labels[post.type]}</Badge>
                   <h3 className="mt-2 font-black">{post.title}</h3>
@@ -1613,33 +1627,33 @@ function MyPage({
           <Empty text="投稿した募集はまだありません" />
         )}
       </section>
-      <section className="mt-8">
-        <h2 className="mb-4 text-xl font-black">参加・参加希望の予定</h2>
-        {joined.length ? (
-          <div className="grid gap-3 md:grid-cols-2">
-            {joined.map((p) => (
-              <div key={p.id} className="relative">
-                <span className="absolute right-3 top-3 z-10 rounded-full bg-white px-2 py-1 text-[10px] font-bold text-primary shadow-sm">
-                  {p.viewer_status === "approved" ? "参加確定" : "承認待ち"}
-                </span>
-                <PostCard post={p} onOpen={onOpen} />
-                {p.viewer_participation_id && (
-                  <Button onClick={() => onChat({ participationId: p.viewer_participation_id!, title: p.title, counterpart: `主催：${p.organizer}`, blocked: p.viewer_chat_blocked, blockedByMe: p.viewer_chat_blocked_by_me })} variant="outline" size="sm" className="absolute bottom-3 right-3 bg-white">
-                    <MessageCircle className="size-4" /> トーク
-                    {!!p.viewer_unread_count && <span className="rounded-full bg-primary px-1.5 text-[10px] text-white">{p.viewer_unread_count}</span>}
-                  </Button>
-                )}
-              </div>
-            ))}
-          </div>
-        ) : (
-          <Empty text="参加予定はまだありません" />
-        )}
-      </section>
       <AccountDeletion role={me.user?.role} />
       <ApplicantsDialog post={applicantsPost} onClose={() => setApplicantsPost(null)} onChat={(target) => { setApplicantsPost(null); onChat(target); }} />
     </>
   );
+}
+
+function JoinedPlans({ posts, onOpen, onChat }: { posts: Post[]; onOpen: (post: Post) => void; onChat: (target: ChatTarget) => void }) {
+  const today = new Date().toLocaleDateString("sv-SE");
+  const future = posts.filter((post) => post.held_on >= today).sort((a, b) => a.held_on.localeCompare(b.held_on));
+  const past = posts.filter((post) => post.held_on < today).sort((a, b) => b.held_on.localeCompare(a.held_on));
+  return <>
+    <section className="mt-6">
+      <h2 className="mb-3 text-xl font-black">次の予定</h2>
+      {future.length ? <div className="divide-y divide-zinc-200 border-y border-zinc-200">{future.map((post) => (
+        <div key={`${post.type}-${post.id}`} className="py-3">
+          <button onClick={() => onOpen(post)} className="w-full text-left">
+            <span className="text-xs font-black text-primary">{formatDate(post.held_on)} · {labels[post.type]}</span>
+            <span className="ml-2 text-xs font-semibold text-zinc-600">{post.viewer_status === "approved" ? "参加確定" : "承認待ち"}</span>
+            <strong className="mt-1 block text-base">{post.title}</strong>
+            <span className="mt-1 block text-xs text-zinc-600">{post.venue}</span>
+          </button>
+          {post.viewer_participation_id && <Button onClick={() => onChat({ participationId: post.viewer_participation_id!, title: post.title, counterpart: `主催：${post.organizer}`, blocked: post.viewer_chat_blocked, blockedByMe: post.viewer_chat_blocked_by_me })} variant="outline" size="sm" className="mt-2 rounded-md"><MessageCircle className="size-4" /> トーク{!!post.viewer_unread_count && <span className="rounded-full bg-primary px-1.5 text-[10px] text-white">{post.viewer_unread_count}</span>}</Button>}
+        </div>
+      ))}</div> : <Empty text="参加予定はまだありません" />}
+    </section>
+    {past.length > 0 && <section className="mt-8"><h2 className="mb-3 text-base font-black">過去に参加した募集</h2><div className="divide-y divide-zinc-200 border-y border-zinc-200">{past.map((post) => <button key={`${post.type}-${post.id}`} onClick={() => onOpen(post)} className="flex w-full items-center gap-3 py-3 text-left text-sm"><span className="shrink-0 text-xs text-zinc-500">{formatDate(post.held_on)}</span><span className="font-bold">{post.title}</span></button>)}</div></section>}
+  </>;
 }
 
 function AccountDeletion({ role }: { role?: string }) {

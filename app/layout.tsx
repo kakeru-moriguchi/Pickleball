@@ -3,18 +3,18 @@ import './globals.css';
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://pickleball-omega-ruby.vercel.app'),
-  title: 'みんなでピックル！！｜ピックルボール仲間を見つけよう',
-  description: '練習会・大会メンバー・イベントを探して参加できる、ピックルボールのコミュニティアプリ。',
+  title: 'Pickle Link｜宮崎でピックルボールしよう',
+  description: 'ピックルボールでつながる。宮崎の練習会・大会メンバー・イベントを探せる地域コミュニティ。',
   openGraph: {
-    title: 'みんなでピックル！！',
-    description: '近くの練習会・大会メンバー・イベントを見つけよう。',
+    title: 'Pickle Link',
+    description: 'ピックルボールでつながる。宮崎の練習会・大会メンバー・イベントを探そう。',
     type: 'website',
     locale: 'ja_JP',
-    siteName: 'みんなでピックル！！',
+    siteName: 'Pickle Link',
   },
   twitter: {
     card: 'summary',
-    title: 'みんなでピックル！！',
+    title: 'Pickle Link',
     description: '近くの練習会・大会メンバー・イベントを見つけよう。',
   },
 };

@@ -35,7 +35,7 @@ export default function ContactPage() {
   return (
     <main className="min-h-screen bg-[#fbfaf8] px-4 py-10 text-zinc-800">
       <section className="mx-auto max-w-lg rounded-xl border border-zinc-200 bg-white p-6 md:p-8">
-        <Link href="/" className="text-sm font-bold text-primary">← みんなでピックル！！へ戻る</Link>
+        <Link href="/" className="text-sm font-bold text-primary">← Pickle Linkへ戻る</Link>
         <h1 className="mt-6 text-2xl font-black">お問い合わせ</h1>
         <p className="mt-2 text-sm leading-6 text-zinc-500">不具合、ご意見、運営へのご相談はこちらからお送りください。</p>
         {sent ? (
