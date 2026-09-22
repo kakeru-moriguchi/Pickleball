@@ -6,6 +6,17 @@ import { getGuestId } from "@/lib/guest";
 type Raw = Record<string, unknown>;
 type ViewerParticipation = { status: string; id: string; unread: number; blocked: boolean; blockedByMe: boolean };
 
+function todayInJapan() {
+  const parts = new Intl.DateTimeFormat("en", {
+    timeZone: "Asia/Tokyo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const value = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${value.year}-${value.month}-${value.day}`;
+}
+
 function mapPost(
   type: PostType,
   row: Raw,
@@ -100,6 +111,9 @@ export async function GET(request: NextRequest) {
       ...(queries[2].data ?? []).map((row) => mapPost("event", row, countMap, participations, pendingCounts, organizerUnread)),
     ];
     const p = request.nextUrl.searchParams;
+    const scope = p.get("scope");
+    const includePast = scope === "mine" || scope === "joined" || p.get("includePast") === "1";
+    if (!includePast) posts = posts.filter((post) => String(post.held_on) >= todayInJapan());
     const type = normalizeType(p.get("type"));
     const q = p.get("q")?.toLowerCase();
     if (type) posts = posts.filter((x) => x.type === type);
@@ -115,7 +129,6 @@ export async function GET(request: NextRequest) {
     }
     const date = p.get("date");
     if (date) posts = posts.filter((x) => x.held_on === date);
-    const scope = p.get("scope");
     if (scope === "mine") {
       if (!user) return NextResponse.json({ error: "ログインが必要です" }, { status: 401 });
       posts = posts.filter((x) => x.author_id === user.id);

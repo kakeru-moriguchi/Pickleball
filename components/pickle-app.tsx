@@ -2086,7 +2086,7 @@ function AdminPage({
   }>({});
   const [allPosts, setAllPosts] = useState<Post[]>([]);
   useEffect(() => {
-    Promise.all([fetch("/api/admin").then(readJson), fetch("/api/posts").then(readJson)])
+    Promise.all([fetch("/api/admin").then(readJson), fetch("/api/posts?includePast=1").then(readJson)])
       .then(([value, posts]) => {
         setData(value as typeof data);
         setAllPosts(posts.posts as Post[]);
