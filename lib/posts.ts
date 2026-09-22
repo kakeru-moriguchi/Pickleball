@@ -18,6 +18,19 @@ export function count(body: Record<string, unknown>, key: string, allowZero = fa
   return Math.round(value);
 }
 
+export function optionalHttpUrl(body: Record<string, unknown>, key: string) {
+  const raw = body[key];
+  const value = typeof raw === "string" ? raw.trim() : "";
+  if (!value) return "";
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "http:" && url.protocol !== "https:") throw new Error();
+    return url.toString();
+  } catch {
+    throw new Error("情報URLは http:// または https:// から始まる正しいURLを入力してください");
+  }
+}
+
 export function timeSlot(body: Record<string, unknown>, key: string) {
   const value = required(body, key);
   const match = /^(?:[01]\d|2[0-3]):(00|30)$/.exec(value);

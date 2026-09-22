@@ -19,6 +19,7 @@ export type CommunityPost = {
   secondary_title: string;
   deadline: string;
   application_method: string;
+  information_url: string;
   viewer_joined: number;
   viewer_status?: "pending" | "approved" | "rejected" | "";
   viewer_participation_id?: string;
@@ -54,6 +55,7 @@ export const developmentSamplePosts: CommunityPost[] = [
     secondary_title: "",
     deadline: "",
     application_method: "",
+    information_url: "",
     viewer_joined: 0,
     created_at: "2026-09-07T09:00:00Z",
     is_demo: true,
@@ -79,6 +81,7 @@ export const developmentSamplePosts: CommunityPost[] = [
     secondary_title: "",
     deadline: "",
     application_method: "",
+    information_url: "",
     viewer_joined: 0,
     created_at: "2026-09-06T11:00:00Z",
     is_demo: true,
@@ -104,6 +107,7 @@ export const developmentSamplePosts: CommunityPost[] = [
     secondary_title: "宮崎オータムカップ",
     deadline: "2026-09-30",
     application_method: "",
+    information_url: "https://example.com/tournament",
     viewer_joined: 0,
     created_at: "2026-09-07T12:00:00Z",
     is_demo: true,
@@ -129,6 +133,7 @@ export const developmentSamplePosts: CommunityPost[] = [
     secondary_title: "",
     deadline: "",
     application_method: "詳細ページの参加ボタンからお申し込みください。",
+    information_url: "https://example.com/event",
     viewer_joined: 0,
     created_at: "2026-09-05T08:00:00Z",
     is_demo: true,

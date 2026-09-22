@@ -12,8 +12,14 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [accepted, setAccepted] = useState(false);
+  const [nextPath, setNextPath] = useState("/");
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).has("error")) {
+    const params = new URLSearchParams(window.location.search);
+    const requestedNext = params.get("next") ?? "/";
+    if (requestedNext.startsWith("/") && !requestedNext.startsWith("//")) {
+      setNextPath(requestedNext);
+    }
+    if (params.has("error")) {
       setMessage("ログインを完了できませんでした。もう一度お試しください。");
     }
   }, []);
@@ -32,11 +38,17 @@ export default function LoginPage() {
     const result =
       mode === "login"
         ? await supabase.auth.signInWithPassword({ email, password })
-        : await supabase.auth.signUp({ email, password });
+        : await supabase.auth.signUp({
+            email,
+            password,
+            options: {
+              emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`,
+            },
+          });
     if (result.error) setMessage(result.error.message);
     else if (mode === "signup" && !result.data.session)
       setMessage("確認メールを送りました。メール内のリンクを開いてください。");
-    else window.location.href = "/";
+    else window.location.href = nextPath;
     setLoading(false);
   }
   async function google() {
@@ -50,7 +62,10 @@ export default function LoginPage() {
       const supabase = createClient();
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
-        options: { redirectTo: `${window.location.origin}/auth/callback`, skipBrowserRedirect: true },
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`,
+          skipBrowserRedirect: true,
+        },
       });
       if (error || !data.url) throw error ?? new Error("Missing authorization URL");
       window.location.assign(data.url);

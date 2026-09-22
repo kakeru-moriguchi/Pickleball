@@ -7,6 +7,7 @@ import {
   CirclePlus,
   Clock3,
   Dumbbell,
+  ExternalLink,
   Home,
   MapPin,
   MapPinned,
@@ -96,6 +97,9 @@ const prefectures = [
   "鳥取県", "島根県", "岡山県", "広島県", "山口県", "徳島県", "香川県", "愛媛県", "高知県",
   "福岡県", "佐賀県", "長崎県", "熊本県", "大分県", "宮崎県", "鹿児島県", "沖縄県",
 ];
+
+const POST_DRAFT_KEY = "pickle-link-post-draft-v1";
+type PostDraft = { type: PostType; values: Record<string, string> };
 
 const nav = [
   { screen: "home" as Screen, label: "ホーム", icon: Home },
@@ -204,6 +208,15 @@ export function PickleApp() {
   useEffect(() => {
     const saved = window.localStorage.getItem("pickle-link-region");
     if (saved && prefectures.includes(saved)) setCurrentRegion(saved);
+  }, []);
+  useEffect(() => {
+    const compose = new URLSearchParams(window.location.search).get("compose");
+    if (compose === "practice" || compose === "member" || compose === "event") {
+      setCreateType(compose);
+      setEditing(null);
+      setScreen("create");
+      window.history.replaceState({}, "", "/");
+    }
   }, []);
   useEffect(() => {
     if (!window.localStorage.getItem("pickle-link-region") && me.user?.prefecture) {
@@ -433,6 +446,7 @@ export function PickleApp() {
         )}
         {screen === "create" && (
           <CreateScreen
+            key={`${createType ?? "choose"}:${editing?.id ?? "new"}`}
             type={createType}
             initial={editing}
             setType={setCreateType}
@@ -966,6 +980,19 @@ function DetailDialog({
             <p className="mt-1 text-sm text-zinc-600">{post.application_method}</p>
           </div>
         )}
+        {post.information_url && (
+          <div>
+            <h4 className="font-black">大会・イベント情報</h4>
+            <a
+              href={post.information_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-2 inline-flex min-h-11 items-center gap-2 rounded-lg border border-pink-200 px-4 text-sm font-bold text-primary hover:bg-pink-50"
+            >
+              公式ページ・詳細を見る <ExternalLink className="size-4" />
+            </a>
+          </div>
+        )}
         <div className="flex items-center justify-between gap-3">
           <p className="text-sm text-zinc-500">主催：{post.organizer}</p>
           <button onClick={() => onReport(post)} className="text-xs text-zinc-400 underline hover:text-red-600">
@@ -1179,8 +1206,25 @@ function CreateScreen({
 }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [draftValues, setDraftValues] = useState<Record<string, string>>({});
+  const [draftLoaded, setDraftLoaded] = useState(false);
+  useEffect(() => {
+    if (initial || !type) {
+      setDraftValues({});
+      setDraftLoaded(true);
+      return;
+    }
+    try {
+      const saved = window.localStorage.getItem(POST_DRAFT_KEY);
+      const draft = saved ? (JSON.parse(saved) as PostDraft) : null;
+      setDraftValues(draft?.type === type ? draft.values : {});
+    } catch {
+      setDraftValues({});
+    }
+    setDraftLoaded(true);
+  }, [initial, type]);
   const value = (key: string) => {
-    if (!initial) return "";
+    if (!initial) return draftValues[key] ?? "";
     const values: Record<string, string | number> = {
       tournamentName: initial.secondary_title,
       title: initial.title,
@@ -1197,8 +1241,16 @@ function CreateScreen({
       description: initial.description,
       organizer: initial.organizer,
       applicationMethod: initial.application_method,
+      informationUrl: initial.information_url,
     };
     return values[key] ?? "";
+  };
+  const saveDraft = (form: HTMLFormElement) => {
+    if (initial || !type) return;
+    const values = Object.fromEntries(
+      Array.from(new FormData(form).entries()).map(([key, entry]) => [key, String(entry)]),
+    );
+    window.localStorage.setItem(POST_DRAFT_KEY, JSON.stringify({ type, values } satisfies PostDraft));
   };
   if (!type)
     return (
@@ -1251,22 +1303,27 @@ function CreateScreen({
     );
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    saveDraft(event.currentTarget);
     setSaving(true);
     setError("");
     const body = Object.fromEntries(new FormData(event.currentTarget));
     try {
-      await readJson(
-        await fetch("/api/posts", {
-          method: initial ? "PATCH" : "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            ...body,
-            type,
-            id: initial?.id,
-            action: initial ? "edit" : undefined,
-          }),
+      const response = await fetch("/api/posts", {
+        method: initial ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...body,
+          type,
+          id: initial?.id,
+          action: initial ? "edit" : undefined,
         }),
-      );
+      });
+      if (response.status === 401 && !initial) {
+        window.location.assign(`/login?next=${encodeURIComponent(`/?compose=${type}`)}`);
+        return;
+      }
+      await readJson(response);
+      if (!initial) window.localStorage.removeItem(POST_DRAFT_KEY);
       onCreated();
     } catch (err) {
       setError(err instanceof Error ? err.message : "投稿に失敗しました");
@@ -1274,6 +1331,8 @@ function CreateScreen({
       setSaving(false);
     }
   }
+  if (!draftLoaded)
+    return <p className="py-12 text-center text-sm text-muted-foreground">下書きを確認しています…</p>;
   return (
     <>
       <button
@@ -1285,9 +1344,16 @@ function CreateScreen({
       <div className="mt-5">
         <Badge>{labels[type]}</Badge>
         <h1 className="mt-3 text-2xl font-black">{initial ? "募集を編集" : "募集内容を入力"}</h1>
+        {!initial && (
+          <p className="mt-2 text-sm text-muted-foreground">
+            入力内容はこの端末に自動保存され、ログイン後も復元されます。
+          </p>
+        )}
       </div>
       <form
         onSubmit={submit}
+        onInput={(event) => saveDraft(event.currentTarget)}
+        onChange={(event) => saveDraft(event.currentTarget)}
         className="mt-6 space-y-6 rounded-xl border border-zinc-200 bg-white p-5 md:p-8"
       >
         {type === "member" && (
@@ -1306,6 +1372,16 @@ function CreateScreen({
           }
           defaultValue={value("title")}
         />
+        {(type === "member" || type === "event") && (
+          <Field
+            label="大会・イベント情報URL（任意）"
+            name="informationUrl"
+            type="url"
+            placeholder="https://example.com/event"
+            defaultValue={value("informationUrl")}
+            required={false}
+          />
+        )}
         {type === "member" ? (
           <div className="grid gap-4 md:grid-cols-2">
             <Field label="開催日" name="heldOn" type="date" defaultValue={value("heldOn")} />
@@ -1435,12 +1511,14 @@ function Field({
   type = "text",
   placeholder,
   defaultValue,
+  required = true,
 }: {
   label: string;
   name: string;
   type?: string;
   placeholder?: string;
   defaultValue?: string | number;
+  required?: boolean;
 }) {
   return (
     <label className="block">
@@ -1450,7 +1528,7 @@ function Field({
         type={type}
         placeholder={placeholder}
         defaultValue={defaultValue}
-        required
+        required={required}
         className="h-11 rounded-lg"
         min={type === "number" ? "0" : undefined}
       />

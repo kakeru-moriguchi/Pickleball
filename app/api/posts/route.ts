@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { count, normalizeType, required, tableFor, timeRange, type PostType } from "@/lib/posts";
+import { count, normalizeType, optionalHttpUrl, required, tableFor, timeRange, type PostType } from "@/lib/posts";
 import { getGuestId } from "@/lib/guest";
 
 type Raw = Record<string, unknown>;
@@ -44,6 +44,7 @@ function mapPost(
     secondary_title: type === "member" ? row.tournament_name : "",
     deadline: type === "member" ? row.deadline : "",
     application_method: type === "event" ? row.application_method : "",
+    information_url: type === "practice" ? "" : String(row.information_url ?? ""),
     viewer_joined: viewerStatus && viewerStatus !== "rejected" ? 1 : 0,
     viewer_status: viewerStatus,
     viewer_participation_id: viewer?.id ?? "",
@@ -166,6 +167,7 @@ function values(type: PostType, body: Record<string, unknown>, userId: string) {
       description: required(body, "description"),
       deadline: required(body, "deadline"),
       author_name: required(body, "organizer"),
+      information_url: optionalHttpUrl(body, "informationUrl") || null,
     };
   return {
     author_id: userId,
@@ -180,6 +182,7 @@ function values(type: PostType, body: Record<string, unknown>, userId: string) {
     description: required(body, "description"),
     organizer: required(body, "organizer"),
     application_method: required(body, "applicationMethod"),
+    information_url: optionalHttpUrl(body, "informationUrl") || null,
   };
 }
 
