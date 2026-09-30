@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import {
   CalendarDays,
   ChevronRight,
@@ -388,13 +388,22 @@ export function PickleApp() {
           </button>
           <div className="hidden flex-1 items-center justify-center gap-1 md:flex">
             {nav.map(({ screen: target, label }) => (
-              <button
-                key={target}
-                onClick={() => go(target)}
-                className={`border-b-2 px-3 py-5 text-sm font-bold transition ${screen === target ? "border-primary text-primary" : "border-transparent text-zinc-500 hover:text-zinc-900"}`}
-              >
-                {label}
-              </button>
+              <Fragment key={target}>
+                {target === "mypage" && (
+                  <a
+                    href="/game-scheduler"
+                    className="border-b-2 border-transparent px-3 py-5 text-sm font-bold text-zinc-500 transition hover:text-zinc-900"
+                  >
+                    乱数表
+                  </a>
+                )}
+                <button
+                  onClick={() => go(target)}
+                  className={`border-b-2 px-3 py-5 text-sm font-bold transition ${screen === target ? "border-primary text-primary" : "border-transparent text-zinc-500 hover:text-zinc-900"}`}
+                >
+                  {label}
+                </button>
+              </Fragment>
             ))}
           </div>
           <Button
