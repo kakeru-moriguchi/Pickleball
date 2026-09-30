@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:scheduler": "node --test --experimental-strip-types lib/game-scheduler.test.ts"
   },
   "dependencies": {
     "@base-ui/react": "1.7.0",
