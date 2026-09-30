@@ -5,7 +5,6 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { ArrowRight, ChevronLeft, RotateCcw, UsersRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import {
   calculateFairness,
   calculateStats,
@@ -16,7 +15,7 @@ import {
 } from "@/lib/game-scheduler";
 
 type Session = {
-  version: 1;
+  version: 2;
   participants: SchedulerParticipant[];
   rounds: SchedulerRound[];
   currentIndex: number;
@@ -25,14 +24,14 @@ type Session = {
 };
 
 type View = "progress" | "schedule" | "stats";
-const STORAGE_KEY = "pickle-link-game-scheduler-v1";
+const STORAGE_KEY = "pickle-link-game-scheduler-v2";
 
 function loadSession(): Session | null {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Session;
-    return parsed.version === 1 && Array.isArray(parsed.participants) && Array.isArray(parsed.rounds)
+    return parsed.version === 2 && Array.isArray(parsed.participants) && Array.isArray(parsed.rounds)
       ? parsed
       : null;
   } catch {
@@ -43,14 +42,12 @@ function loadSession(): Session | null {
 export function GameScheduler() {
   const [session, setSession] = useState<Session | null>(null);
   const [loaded, setLoaded] = useState(false);
-  const [names, setNames] = useState("");
+  const [participantCount, setParticipantCount] = useState(8);
   const [courtCount, setCourtCount] = useState(1);
-  const [roundCount, setRoundCount] = useState(8);
   const [view, setView] = useState<View>("progress");
   const [error, setError] = useState("");
   const [generating, setGenerating] = useState(false);
   const [selectedPlayer, setSelectedPlayer] = useState<string | null>(null);
-  const [newParticipant, setNewParticipant] = useState("");
   const [nextCourtCount, setNextCourtCount] = useState(1);
 
   useEffect(() => {
@@ -86,20 +83,17 @@ export function GameScheduler() {
     setError("");
     await new Promise((resolve) => window.setTimeout(resolve, 20));
     try {
-      const participantNames = names
-        .split(/\r?\n|,/)
-        .map((name) => name.trim())
-        .filter(Boolean);
-      if (participantNames.length < 4) throw new Error("参加者名を4人以上入力してください");
-      if (new Set(participantNames).size !== participantNames.length)
-        throw new Error("同じ参加者名が重複しています");
-      const participants = participantNames.map((name, index) => ({
+      if (!Number.isInteger(participantCount) || participantCount < 4 || participantCount > 40)
+        throw new Error("参加人数は4〜40人で入力してください");
+      if (!Number.isInteger(courtCount) || courtCount < 1 || courtCount > 8)
+        throw new Error("コート数は1〜8面で入力してください");
+      const participants = Array.from({ length: participantCount }, (_, index) => ({
         id: `player-${index + 1}`,
-        name,
+        name: `${index + 1}番`,
         active: true,
       }));
-      const rounds = generateRounds(participants, courtCount, roundCount);
-      setSession({ version: 1, participants, rounds, currentIndex: 0, plannedRounds: roundCount, courtCount });
+      const rounds = generateRounds(participants, courtCount, participantCount);
+      setSession({ version: 2, participants, rounds, currentIndex: 0, plannedRounds: participantCount, courtCount });
       setNextCourtCount(courtCount);
       setView("progress");
     } catch (cause) {
@@ -117,21 +111,14 @@ export function GameScheduler() {
     setSession({ ...currentSession, participants: nextParticipants, courtCount: courts, rounds: [...history, ...future] });
   }
 
-  function addParticipant(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  function addParticipant() {
     if (!session) return;
-    const name = newParticipant.trim();
-    if (!name) return;
-    if (session.participants.some((participant) => participant.name === name)) {
-      setError("同じ名前の参加者が登録されています");
-      return;
-    }
+    const number = session.participants.length + 1;
     const participant: SchedulerParticipant = {
-      id: `player-${Date.now().toString(36)}`,
-      name,
+      id: `player-${number}`,
+      name: `${number}番`,
       active: true,
     };
-    setNewParticipant("");
     setError("");
     regenerateFuture([...session.participants, participant], session.courtCount);
   }
@@ -211,12 +198,10 @@ export function GameScheduler() {
 
       {!session ? (
         <SetupForm
-          names={names}
-          setNames={setNames}
+          participantCount={participantCount}
+          setParticipantCount={setParticipantCount}
           courtCount={courtCount}
           setCourtCount={setCourtCount}
-          roundCount={roundCount}
-          setRoundCount={setRoundCount}
           generating={generating}
           error={error}
           onSubmit={createSchedule}
@@ -247,8 +232,6 @@ export function GameScheduler() {
               nameMap={nameMap}
               selectedPlayer={selectedPlayer}
               onSelect={selectForSwap}
-              newParticipant={newParticipant}
-              setNewParticipant={setNewParticipant}
               onAdd={addParticipant}
               onToggle={toggleParticipant}
               nextCourtCount={nextCourtCount}
@@ -284,27 +267,22 @@ export function GameScheduler() {
 }
 
 function SetupForm({
-  names,
-  setNames,
+  participantCount,
+  setParticipantCount,
   courtCount,
   setCourtCount,
-  roundCount,
-  setRoundCount,
   generating,
   error,
   onSubmit,
 }: {
-  names: string;
-  setNames: (value: string) => void;
+  participantCount: number;
+  setParticipantCount: (value: number) => void;
   courtCount: number;
   setCourtCount: (value: number) => void;
-  roundCount: number;
-  setRoundCount: (value: number) => void;
   generating: boolean;
   error: string;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
-  const count = names.split(/\r?\n|,/).map((name) => name.trim()).filter(Boolean).length;
   return (
     <main className="mx-auto max-w-xl px-4 py-7">
       <p className="text-sm font-bold text-primary">練習会当日の運営ツール</p>
@@ -313,32 +291,18 @@ function SetupForm({
         出場・休憩回数、ペアと対戦相手の重複、連続出場を比べて、偏りの少ない組み合わせを選びます。
       </p>
       <form onSubmit={onSubmit} className="mt-7 space-y-6 border-t border-zinc-300 pt-6">
-        <label className="block">
-          <span className="flex items-center justify-between text-sm font-bold">
-            参加者名 <span className="font-normal text-zinc-500">{count}人</span>
-          </span>
-          <Textarea
-            value={names}
-            onChange={(event) => setNames(event.target.value)}
-            rows={10}
-            required
-            placeholder={"田中\n佐藤\n鈴木\n高橋"}
-            className="mt-2 bg-white text-base leading-7"
-          />
-          <span className="mt-2 block text-xs leading-5 text-zinc-500">1行に1人入力してください。欠席者は生成前に名前を削除します。</span>
-        </label>
         <div className="grid grid-cols-2 gap-4">
+          <label>
+            <span className="text-sm font-bold">参加人数</span>
+            <Input type="number" min="4" max="40" value={participantCount} onChange={(event) => setParticipantCount(Number(event.target.value))} className="mt-2 h-12 bg-white text-base" />
+          </label>
           <label>
             <span className="text-sm font-bold">コート数</span>
             <Input type="number" min="1" max="8" value={courtCount} onChange={(event) => setCourtCount(Number(event.target.value))} className="mt-2 h-12 bg-white text-base" />
           </label>
-          <label>
-            <span className="text-sm font-bold">試合数</span>
-            <Input type="number" min="1" max="40" value={roundCount} onChange={(event) => setRoundCount(Number(event.target.value))} className="mt-2 h-12 bg-white text-base" />
-          </label>
         </div>
         <p className="border-l-4 border-amber-400 bg-amber-50 p-3 text-xs leading-5 text-amber-900">
-          1試合は4人です。人数が足りないコートは使用せず、休憩者を公平に割り当てます。
+          参加者は1番から自動で番号を振ります。各コートは2人対2人のダブルスで、休憩者も公平に割り当てます。まず参加人数と同じ回数を作成します。
         </p>
         {error && <p role="alert" className="border-l-4 border-red-500 bg-red-50 p-3 text-sm text-red-700">{error}</p>}
         <Button type="submit" disabled={generating} className="h-13 w-full text-base font-black">
@@ -354,8 +318,6 @@ function ProgressView({
   nameMap,
   selectedPlayer,
   onSelect,
-  newParticipant,
-  setNewParticipant,
   onAdd,
   onToggle,
   nextCourtCount,
@@ -366,9 +328,7 @@ function ProgressView({
   nameMap: Map<string, string>;
   selectedPlayer: string | null;
   onSelect: (id: string) => void;
-  newParticipant: string;
-  setNewParticipant: (value: string) => void;
-  onAdd: (event: FormEvent<HTMLFormElement>) => void;
+  onAdd: () => void;
   onToggle: (id: string) => void;
   nextCourtCount: number;
   setNextCourtCount: (value: number) => void;
@@ -395,10 +355,9 @@ function ProgressView({
       <details className="mt-8 border-y border-zinc-300 py-4">
         <summary className="min-h-11 cursor-pointer py-2 font-bold">途中参加・退出・コート変更</summary>
         <div className="space-y-6 pt-4">
-          <form onSubmit={onAdd} className="flex gap-2">
-            <Input value={newParticipant} onChange={(event) => setNewParticipant(event.target.value)} placeholder="途中参加者の名前" className="h-11 bg-white" />
-            <Button type="submit" variant="outline" className="h-11 shrink-0">追加</Button>
-          </form>
+          <Button type="button" onClick={onAdd} variant="outline" className="h-11 w-full">
+            途中参加者を1人追加（{session.participants.length + 1}番）
+          </Button>
           <div>
             <h3 className="text-sm font-bold">参加状況</h3>
             <div className="mt-2 divide-y divide-zinc-200 border-y border-zinc-200">
@@ -435,7 +394,9 @@ function RoundBoard({ round, nameMap, editable = false, selectedPlayer, onSelect
     <div className="mt-3 space-y-3">
       {round.courts.map((court) => (
         <div key={court.court} className="border-l-4 border-primary bg-white p-3 shadow-sm">
-          <p className="mb-2 text-xs font-black tracking-wider text-primary">コート {court.court}</p>
+          <p className="mb-2 flex items-center justify-between text-xs font-black tracking-wider text-primary">
+            <span>コート {court.court}</span><span className="text-zinc-500">ダブルス</span>
+          </p>
           <div className="flex items-center gap-1.5">
             <PlayerButton id={court.teamA[0]} nameMap={nameMap} selected={selectedPlayer === court.teamA[0]} onSelect={editable ? onSelect : undefined} />
             <PlayerButton id={court.teamA[1]} nameMap={nameMap} selected={selectedPlayer === court.teamA[1]} onSelect={editable ? onSelect : undefined} />
