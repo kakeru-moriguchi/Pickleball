@@ -85,6 +85,7 @@ const labels: Record<PostType, string> = {
 };
 const categoryOptions = ["男子ダブルス", "女子ダブルス", "ミックスダブルス", "団体戦", "その他"];
 const eventOptions = ["大会", "交流会", "練習会", "体験会", "講習会", "その他"];
+const competitionFormatOptions = ["団体戦", "個人戦"];
 const levelOptions = ["初心者歓迎", "初級", "中級", "上級", "レベル不問"];
 const timeOptions = Array.from({ length: 48 }, (_, index) => {
   const hours = Math.floor(index / 2).toString().padStart(2, "0");
@@ -958,7 +959,9 @@ function EventPostCard({ post, onOpen }: { post: Post; onOpen: (p: Post) => void
       </div>
       <div className="min-w-0 flex-1 p-4">
         <div className="flex items-center justify-between gap-2">
-          <span className="text-xs font-black text-primary">{post.category || "イベント"}</span>
+          <span className="text-xs font-black text-primary">
+            {post.category || "イベント"}{post.competition_format ? `・${post.competition_format}` : ""}
+          </span>
           <ChevronRight className="size-4 shrink-0 text-zinc-300 transition group-hover:translate-x-0.5" />
         </div>
         <h3 className="mt-1 line-clamp-2 font-black leading-snug text-zinc-900">{post.title}</h3>
@@ -984,17 +987,21 @@ function DetailDialog({
   onChat: (p: Post) => void;
 }) {
   if (!post) return null;
+  const isTournament = post.type === "event" && post.category === "大会";
+  const tournamentUnit = post.competition_format === "団体戦" ? "チーム" : "ペア";
+  const capacityUnit = isTournament ? tournamentUnit : "人";
   const full = post.status === "closed" || post.participant_count >= post.capacity;
   const action = post.viewer_joined
     ? post.type === "member" ? "参加希望をキャンセル" : "参加をキャンセル"
-    : post.type === "member" ? "参加希望" : "参加する";
+    : post.type === "member" ? "参加希望" : isTournament ? "大会に応募する" : "参加する";
   return (
     <Dialog open={!!post} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-h-[90vh] overflow-y-auto rounded-xl border-zinc-200 sm:max-w-lg">
         <DialogHeader>
           <div className="mb-2 flex gap-2">
-            <Badge>{labels[post.type]}</Badge>
-            <Badge variant="secondary">{post.category || post.level}</Badge>
+            <Badge>{isTournament ? "大会" : labels[post.type]}</Badge>
+            {!isTournament && <Badge variant="secondary">{post.category || post.level}</Badge>}
+            {post.competition_format && <Badge variant="secondary">{post.competition_format}</Badge>}
             {post.viewer_status && post.viewer_status !== "rejected" && (
               <Badge variant={post.viewer_status === "approved" ? "default" : "secondary"}>
                 {post.viewer_status === "approved" ? "参加確定" : "承認待ち"}
@@ -1023,7 +1030,12 @@ function DetailDialog({
           </p>
           <p>
             <WalletCards className="mb-1 size-4 text-primary" />
-            {post.fee ? `${post.fee.toLocaleString()}円` : "無料・要確認"}
+            {post.fee
+              ? `${post.fee.toLocaleString()}円${isTournament ? `／1${tournamentUnit}` : ""}`
+              : "無料・要確認"}
+          </p>
+          <p className="col-span-2 border-t border-zinc-200 pt-3 font-bold">
+            {isTournament ? `募集${tournamentUnit}数` : "定員"}：{post.capacity}{capacityUnit}
           </p>
         </div>
         <div>
@@ -1062,7 +1074,7 @@ function DetailDialog({
         )}
         <div className="sticky bottom-0 -mx-4 -mb-4 flex items-center gap-4 border-t border-zinc-200 bg-white p-4">
           <div className="min-w-20 text-sm">
-            <strong className="text-lg">{post.participant_count}</strong> / {post.capacity}人
+            <strong className="text-lg">{post.participant_count}</strong> / {post.capacity}{capacityUnit}
           </div>
           {post.viewer_participation_id && post.viewer_joined ? (
             <Button onClick={() => onChat(post)} variant="outline" className="relative h-12 rounded-lg px-3 font-bold">
@@ -1159,6 +1171,8 @@ function ApplicationDialog({
   const [error, setError] = useState("");
   if (!post) return null;
   const available = Math.max(1, post.capacity - post.participant_count);
+  const isTournament = post.type === "event" && post.category === "大会";
+  const applicationUnit = post.competition_format === "団体戦" ? "チーム" : "ペア";
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -1205,7 +1219,9 @@ function ApplicationDialog({
             defaultValue={me.user?.level}
           />
           <label className="block">
-            <span className="mb-2 block text-sm font-bold">参加人数</span>
+            <span className="mb-2 block text-sm font-bold">
+              {isTournament ? `応募${applicationUnit}数` : "参加人数"}
+            </span>
             <Input
               name="partySize"
               type="number"
@@ -1215,7 +1231,9 @@ function ApplicationDialog({
               required
               className="h-11 rounded-lg"
             />
-            <span className="mt-1 block text-xs text-muted-foreground">残り{available}名まで応募できます</span>
+            <span className="mt-1 block text-xs text-muted-foreground">
+              残り{available}{isTournament ? applicationUnit : "名"}まで応募できます
+            </span>
           </label>
           <div className="grid grid-cols-3 gap-2">
             {[
@@ -1270,6 +1288,9 @@ function CreateScreen({
   const [error, setError] = useState("");
   const [draftValues, setDraftValues] = useState<Record<string, string>>({});
   const [draftLoaded, setDraftLoaded] = useState(false);
+  const [competitionFormat, setCompetitionFormat] = useState(
+    initial?.competition_format || (defaultEventCategory === "大会" ? "個人戦" : ""),
+  );
   useEffect(() => {
     if (initial || !type) {
       setDraftValues({});
@@ -1285,6 +1306,15 @@ function CreateScreen({
     }
     setDraftLoaded(true);
   }, [initial, type]);
+  useEffect(() => {
+    if (!draftLoaded || type !== "event") return;
+    const category = initial?.category ?? draftValues.category ?? defaultEventCategory;
+    setCompetitionFormat(
+      category === "大会"
+        ? initial?.competition_format || draftValues.competitionFormat || "個人戦"
+        : "",
+    );
+  }, [defaultEventCategory, draftLoaded, draftValues, initial, type]);
   const value = (key: string) => {
     if (!initial)
       return draftValues[key] ?? (type === "event" && key === "category" ? defaultEventCategory : "");
@@ -1300,6 +1330,7 @@ function CreateScreen({
       capacity: initial.capacity,
       fee: initial.fee,
       category: initial.category,
+      competitionFormat: initial.competition_format,
       level: initial.level,
       description: initial.description,
       organizer: initial.organizer,
@@ -1409,6 +1440,7 @@ function CreateScreen({
     return <p className="py-12 text-center text-sm text-muted-foreground">下書きを確認しています…</p>;
   const isTournament =
     type === "event" && (initial?.category ?? draftValues.category ?? defaultEventCategory) === "大会";
+  const tournamentUnit = competitionFormat === "団体戦" ? "チーム" : "ペア";
   return (
     <>
       <button
@@ -1486,9 +1518,27 @@ function CreateScreen({
             defaultValue={value("venue")}
           />
         </div>
+        {isTournament && (
+          <>
+            <input type="hidden" name="category" value="大会" />
+            <SelectField
+              label="大会形式"
+              name="competitionFormat"
+              options={competitionFormatOptions}
+              value={competitionFormat}
+              onValueChange={setCompetitionFormat}
+            />
+          </>
+        )}
         <div className="grid gap-4 md:grid-cols-2">
           <Field
-            label={type === "member" ? "募集人数" : "定員"}
+            label={
+              isTournament
+                ? `募集${tournamentUnit}数`
+                : type === "member"
+                  ? "募集人数"
+                  : "定員"
+            }
             name="capacity"
             type="number"
             placeholder="8"
@@ -1496,7 +1546,7 @@ function CreateScreen({
           />
           {type !== "member" && (
             <Field
-              label="参加費（円）"
+              label={isTournament ? `参加費（円／1${tournamentUnit}）` : "参加費（円）"}
               name="fee"
               type="number"
               placeholder="0"
@@ -1504,11 +1554,11 @@ function CreateScreen({
             />
           )}
         </div>
-        {type === "event" ? (
+        {type === "event" && !isTournament ? (
           <SelectField
             label="イベント種類"
             name="category"
-            options={eventOptions}
+            options={eventOptions.filter((option) => option !== "大会")}
             defaultValue={value("category")}
           />
         ) : type === "member" ? (
@@ -1639,18 +1689,29 @@ function SelectField({
   name,
   options,
   defaultValue,
+  value,
+  onValueChange,
   required = true,
 }: {
   label: string;
   name: string;
   options: string[];
   defaultValue?: string | number;
+  value?: string;
+  onValueChange?: (value: string) => void;
   required?: boolean;
 }) {
   return (
     <label className="block">
       <span className="mb-2 block text-sm font-bold">{label}</span>
-      <NativeSelect name={name} required={required} className="w-full" defaultValue={defaultValue}>
+      <NativeSelect
+        name={name}
+        required={required}
+        className="w-full"
+        defaultValue={value === undefined ? defaultValue : undefined}
+        value={value}
+        onChange={onValueChange ? (event) => onValueChange(event.target.value) : undefined}
+      >
         <NativeSelectOption value="">選択してください</NativeSelectOption>
         {options.map((x) => (
           <NativeSelectOption key={x}>{x}</NativeSelectOption>

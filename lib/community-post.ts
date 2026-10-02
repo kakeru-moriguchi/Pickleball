@@ -12,6 +12,7 @@ export type CommunityPost = {
   fee: number;
   level: string;
   category: string;
+  competition_format: string;
   description: string;
   organizer: string;
   status: "open" | "closed";
@@ -48,6 +49,7 @@ export const developmentSamplePosts: CommunityPost[] = [
     fee: 500,
     level: "初心者歓迎",
     category: "",
+    competition_format: "",
     description: "ラリー中心の気軽な練習会です。初参加の方も歓迎します。室内シューズをご持参ください。",
     organizer: "森口",
     status: "open",
@@ -74,6 +76,7 @@ export const developmentSamplePosts: CommunityPost[] = [
     fee: 300,
     level: "初級",
     category: "",
+    competition_format: "",
     description: "ルール確認から始めます。ラケットの貸し出しも少しあります。",
     organizer: "田中",
     status: "open",
@@ -100,6 +103,7 @@ export const developmentSamplePosts: CommunityPost[] = [
     fee: 0,
     level: "中級",
     category: "ミックスダブルス",
+    competition_format: "",
     description: "勝ち負けよりも楽しく、最後まで声を掛け合える方だとうれしいです。",
     organizer: "佐藤",
     status: "open",
@@ -126,6 +130,7 @@ export const developmentSamplePosts: CommunityPost[] = [
     fee: 1000,
     level: "",
     category: "交流会",
+    competition_format: "",
     description: "年代や経験を問わず楽しめる交流イベントです。ミニゲームも予定しています。",
     organizer: "宮崎ピックルボールクラブ",
     status: "open",

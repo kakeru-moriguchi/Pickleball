@@ -42,6 +42,7 @@ function mapPost(
     fee: type === "member" ? 0 : row.fee,
     level: type === "event" ? "" : row.level,
     category: type === "practice" ? "" : type === "member" ? row.category : row.event_type,
+    competition_format: type === "event" ? String(row.competition_format ?? "") : "",
     description: row.description,
     organizer:
       type === "practice"
@@ -182,10 +183,15 @@ function values(type: PostType, body: Record<string, unknown>, userId: string) {
       author_name: required(body, "organizer"),
       information_url: optionalHttpUrl(body, "informationUrl") || null,
     };
+  const eventType = required(body, "category");
+  const competitionFormat = eventType === "大会" ? required(body, "competitionFormat") : null;
+  if (competitionFormat && competitionFormat !== "団体戦" && competitionFormat !== "個人戦")
+    throw new Error("大会形式が正しくありません");
   return {
     author_id: userId,
     event_name: required(body, "title"),
-    event_type: required(body, "category"),
+    event_type: eventType,
+    competition_format: competitionFormat,
     held_on: required(body, "heldOn"),
     ...timeRange(body),
     venue: required(body, "venue"),
