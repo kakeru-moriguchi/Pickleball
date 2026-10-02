@@ -13,6 +13,7 @@ import {
   MapPinned,
   MessageCircle,
   Search,
+  Shuffle,
   Trophy,
   UserRound,
   UsersRound,
@@ -488,18 +489,28 @@ export function PickleApp() {
 
       <nav
         aria-label="メインナビゲーション"
-        className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-zinc-200 bg-white/97 px-1 pb-[max(.45rem,env(safe-area-inset-bottom))] pt-1.5 backdrop-blur-md md:hidden"
+        className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-6 border-t border-zinc-200 bg-white/97 px-1 pb-[max(.45rem,env(safe-area-inset-bottom))] pt-1.5 backdrop-blur-md md:hidden"
       >
         {nav.map(({ screen: target, label, icon: Icon }) => (
-          <button
-            key={target}
-            onClick={() => go(target)}
-            className={`relative flex min-h-13 flex-col items-center justify-center gap-1 text-[10px] font-bold transition ${screen === target ? "text-primary" : "text-zinc-500"}`}
-          >
-            {screen === target && <span className="absolute top-0 h-0.5 w-8 rounded-full bg-primary" />}
-            <Icon className="size-[19px]" strokeWidth={screen === target ? 2.5 : 2} />
-            <span>{label}</span>
-          </button>
+          <Fragment key={target}>
+            {target === "mypage" && (
+              <a
+                href="/game-scheduler"
+                className="relative flex min-h-13 flex-col items-center justify-center gap-1 text-[10px] font-bold text-zinc-500 transition"
+              >
+                <Shuffle className="size-[19px]" strokeWidth={2} />
+                <span>乱数表</span>
+              </a>
+            )}
+            <button
+              onClick={() => go(target)}
+              className={`relative flex min-h-13 flex-col items-center justify-center gap-1 text-[10px] font-bold transition ${screen === target ? "text-primary" : "text-zinc-500"}`}
+            >
+              {screen === target && <span className="absolute top-0 h-0.5 w-8 rounded-full bg-primary" />}
+              <Icon className="size-[19px]" strokeWidth={screen === target ? 2.5 : 2} />
+              <span>{label}</span>
+            </button>
+          </Fragment>
         ))}
       </nav>
 
