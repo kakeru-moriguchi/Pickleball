@@ -36,7 +36,8 @@ import { developmentSamplePosts, type CommunityPost } from "@/lib/community-post
 import { createClient as createBrowserClient } from "@/lib/supabase/client";
 
 type PostType = "practice" | "member" | "event";
-type Screen = "home" | PostType | "create" | "mypage" | "admin";
+type ListScreenType = PostType | "tournament";
+type Screen = "home" | ListScreenType | "create" | "mypage" | "admin";
 type Post = CommunityPost;
 type UserProfile = {
   id: string;
@@ -106,9 +107,23 @@ const nav = [
   { screen: "home" as Screen, label: "ホーム", icon: Home },
   { screen: "practice" as Screen, label: "練習会", icon: Dumbbell },
   { screen: "member" as Screen, label: "メンバー", icon: UsersRound },
+  { screen: "tournament" as Screen, label: "大会", icon: Trophy },
   { screen: "event" as Screen, label: "イベント", icon: CalendarDays },
   { screen: "mypage" as Screen, label: "マイページ", icon: UserRound },
 ];
+
+const emptyFilters = { prefecture: "", date: "", level: "", category: "" };
+
+function isListScreen(screen: Screen): screen is ListScreenType {
+  return screen === "practice" || screen === "member" || screen === "tournament" || screen === "event";
+}
+
+function matchesListScreen(post: Post, screen: Screen) {
+  if (screen === "tournament") return post.type === "event" && post.category === "大会";
+  if (screen === "event") return post.type === "event" && post.category !== "大会";
+  if (screen === "practice" || screen === "member") return post.type === screen;
+  return true;
+}
 
 function formatDate(value: string) {
   if (!value) return "日程未定";
@@ -130,8 +145,7 @@ function filterDevelopmentPosts(
   filters: { prefecture: string; date: string; level: string; category: string },
 ) {
   return developmentSamplePosts.filter((post) => {
-    if ((screen === "practice" || screen === "member" || screen === "event") && post.type !== screen)
-      return false;
+    if (isListScreen(screen) && !matchesListScreen(post, screen)) return false;
     if (
       q &&
       ![post.title, post.venue, post.description, post.secondary_title].some((value) =>
@@ -161,9 +175,10 @@ export function PickleApp() {
   const [reporting, setReporting] = useState<Post | null>(null);
   const [chatTarget, setChatTarget] = useState<ChatTarget | null>(null);
   const [createType, setCreateType] = useState<PostType | null>(null);
+  const [createEventCategory, setCreateEventCategory] = useState("");
   const [editing, setEditing] = useState<Post | null>(null);
   const [q, setQ] = useState("");
-  const [filters, setFilters] = useState({ prefecture: "", date: "", level: "", category: "" });
+  const [filters, setFilters] = useState(emptyFilters);
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState("");
   const [me, setMe] = useState<Me>({ signedIn: false });
@@ -174,13 +189,12 @@ export function PickleApp() {
   const loadPosts = useCallback(async () => {
     setLoading(true);
     const params = new URLSearchParams();
-    if (screen === "practice" || screen === "member" || screen === "event")
-      params.set("type", screen);
+    if (isListScreen(screen)) params.set("type", screen === "tournament" ? "event" : screen);
     if (q) params.set("q", q);
     Object.entries(filters).forEach(([key, value]) => value && params.set(key, value));
     try {
       const data = await readJson(await fetch(`/api/posts?${params}`));
-      let nextPosts = data.posts as Post[];
+      let nextPosts = (data.posts as Post[]).filter((post) => matchesListScreen(post, screen));
       if (process.env.NODE_ENV === "development" && nextPosts.length === 0) {
         nextPosts = filterDevelopmentPosts(screen, q, filters);
       }
@@ -303,18 +317,21 @@ export function PickleApp() {
   }, []);
 
   const go = (next: Screen) => {
+    if (isListScreen(next) && next !== screen) setFilters(emptyFilters);
     setScreen(next);
     setSelected(null);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
-  const openCreate = (type?: PostType) => {
+  const openCreate = (type?: PostType, eventCategory = "") => {
     setEditing(null);
     setCreateType(type ?? null);
+    setCreateEventCategory(eventCategory);
     go("create");
   };
   const openEdit = (post: Post) => {
     setEditing(post);
     setCreateType(post.type);
+    setCreateEventCategory("");
     go("create");
   };
   const changeRegion = (region: string) => {
@@ -440,7 +457,7 @@ export function PickleApp() {
             onRegionChange={changeRegion}
           />
         )}
-        {(screen === "practice" || screen === "member" || screen === "event") && (
+        {isListScreen(screen) && (
           <ListScreen
             type={screen}
             posts={posts}
@@ -451,15 +468,22 @@ export function PickleApp() {
             setFilters={setFilters}
             onSearch={submitSearch}
             onOpen={setSelected}
-            onCreate={() => openCreate(screen)}
+            onCreate={() =>
+              openCreate(
+                screen === "tournament" ? "event" : screen,
+                screen === "tournament" ? "大会" : screen === "event" ? "交流会" : "",
+              )
+            }
           />
         )}
         {screen === "create" && (
           <CreateScreen
-            key={`${createType ?? "choose"}:${editing?.id ?? "new"}`}
+            key={`${createType ?? "choose"}:${createEventCategory}:${editing?.id ?? "new"}`}
             type={createType}
             initial={editing}
+            defaultEventCategory={createEventCategory}
             setType={setCreateType}
+            setDefaultEventCategory={setCreateEventCategory}
             onBack={() => go("home")}
             onCreated={() => {
               setEditing(null);
@@ -489,25 +513,25 @@ export function PickleApp() {
 
       <nav
         aria-label="メインナビゲーション"
-        className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-6 border-t border-zinc-200 bg-white/97 px-1 pb-[max(.45rem,env(safe-area-inset-bottom))] pt-1.5 backdrop-blur-md md:hidden"
+        className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-7 border-t border-zinc-200 bg-white/97 px-0.5 pb-[max(.45rem,env(safe-area-inset-bottom))] pt-1.5 backdrop-blur-md md:hidden"
       >
         {nav.map(({ screen: target, label, icon: Icon }) => (
           <Fragment key={target}>
             {target === "mypage" && (
               <a
                 href="/game-scheduler"
-                className="relative flex min-h-13 flex-col items-center justify-center gap-1 text-[10px] font-bold text-zinc-500 transition"
+                className="relative flex min-h-13 flex-col items-center justify-center gap-1 text-[9px] font-bold text-zinc-500 transition"
               >
-                <Shuffle className="size-[19px]" strokeWidth={2} />
+                <Shuffle className="size-[18px]" strokeWidth={2} />
                 <span>乱数表</span>
               </a>
             )}
             <button
               onClick={() => go(target)}
-              className={`relative flex min-h-13 flex-col items-center justify-center gap-1 text-[10px] font-bold transition ${screen === target ? "text-primary" : "text-zinc-500"}`}
+              className={`relative flex min-h-13 flex-col items-center justify-center gap-1 text-[9px] font-bold transition ${screen === target ? "text-primary" : "text-zinc-500"}`}
             >
               {screen === target && <span className="absolute top-0 h-0.5 w-8 rounded-full bg-primary" />}
-              <Icon className="size-[19px]" strokeWidth={screen === target ? 2.5 : 2} />
+              <Icon className="size-[18px]" strokeWidth={screen === target ? 2.5 : 2} />
               <span>{label}</span>
             </button>
           </Fragment>
@@ -613,15 +637,16 @@ function HomeScreen({
   onSearch: (e: FormEvent) => void;
   onOpen: (p: Post) => void;
   onMore: (s: Screen) => void;
-  onCreate: (t: PostType) => void;
+  onCreate: (t: PostType, eventCategory?: string) => void;
   region: string;
   onRegionChange: (region: string) => void;
 }) {
   const regionalPosts = posts.filter((post) => post.prefecture === region);
   const groups = [
-    { type: "practice" as PostType, title: "今週参加できる練習会", link: "練習会をもっと見る" },
-    { type: "member" as PostType, title: "大会メンバーを探している人", link: "メンバー募集を見る" },
-    { type: "event" as PostType, title: "近くの大会・イベント", link: "イベント一覧を見る" },
+    { screen: "practice" as ListScreenType, postType: "practice" as PostType, title: "今週参加できる練習会", link: "練習会をもっと見る" },
+    { screen: "member" as ListScreenType, postType: "member" as PostType, title: "大会メンバーを探している人", link: "メンバー募集を見る" },
+    { screen: "tournament" as ListScreenType, postType: "event" as PostType, title: "近くの大会", link: "大会一覧を見る" },
+    { screen: "event" as ListScreenType, postType: "event" as PostType, title: "近くのイベント", link: "イベント一覧を見る" },
   ];
   return (
     <>
@@ -666,19 +691,24 @@ function HomeScreen({
       )}
 
       {groups.map((group, index) => (
-        <section key={group.type} className={index === 0 ? "mt-6" : "mt-9"}>
+        <section key={group.screen} className={index === 0 ? "mt-6" : "mt-9"}>
           <div className="mb-3 flex items-end justify-between gap-4">
             <h2 className="text-lg font-black tracking-tight md:text-xl">{group.title}</h2>
-            <button onClick={() => onMore(group.type)} className="shrink-0 text-xs font-bold text-primary">
+            <button onClick={() => onMore(group.screen)} className="shrink-0 text-xs font-bold text-primary">
               {group.link} <span aria-hidden>›</span>
             </button>
           </div>
           <CardGrid
-            posts={regionalPosts.filter((p) => p.type === group.type).slice(0, 3)}
+            posts={regionalPosts.filter((post) => matchesListScreen(post, group.screen)).slice(0, 3)}
             loading={loading}
-            type={group.type}
+            type={group.postType}
             onOpen={onOpen}
-            onCreate={() => onCreate(group.type)}
+            onCreate={() =>
+              onCreate(
+                group.postType,
+                group.screen === "tournament" ? "大会" : group.screen === "event" ? "交流会" : "",
+              )
+            }
           />
         </section>
       ))}
@@ -710,7 +740,7 @@ function ListScreen({
   onOpen,
   onCreate,
 }: {
-  type: PostType;
+  type: ListScreenType;
   posts: Post[];
   loading: boolean;
   q: string;
@@ -721,14 +751,22 @@ function ListScreen({
   onOpen: (p: Post) => void;
   onCreate: () => void;
 }) {
+  const postType: PostType = type === "tournament" ? "event" : type;
+  const title = type === "tournament" ? "大会" : labels[type];
   return (
     <>
       <div className="flex items-end justify-between border-b border-zinc-200 pb-4">
         <div>
           <p className="text-xs font-bold text-primary">
-            {type === "practice" ? "一緒に打てる場所を探す" : type === "member" ? "一緒に大会へ出る仲間を探す" : "近くで開催される予定"}
+            {type === "practice"
+              ? "一緒に打てる場所を探す"
+              : type === "member"
+                ? "一緒に大会へ出る仲間を探す"
+                : type === "tournament"
+                  ? "近くで開催される大会"
+                  : "交流会・体験会・講習会を探す"}
           </p>
-          <h1 className="mt-1 text-2xl font-black tracking-tight">{labels[type]}</h1>
+          <h1 className="mt-1 text-2xl font-black tracking-tight">{title}</h1>
         </div>
         <Button onClick={onCreate} variant="outline" className="hidden rounded-lg md:flex">
           <CirclePlus />
@@ -756,7 +794,7 @@ function ListScreen({
           onChange={(e) => setFilters({ ...filters, date: e.target.value })}
           className="w-40"
         />
-        {type !== "event" && (
+        {postType !== "event" && (
           <NativeSelect
             value={filters.level}
             onChange={(e) => setFilters({ ...filters, level: e.target.value })}
@@ -768,14 +806,14 @@ function ListScreen({
             ))}
           </NativeSelect>
         )}
-        {type !== "practice" && (
+        {type !== "practice" && type !== "tournament" && (
           <NativeSelect
             value={filters.category}
             onChange={(e) => setFilters({ ...filters, category: e.target.value })}
             className="min-w-32"
           >
             <NativeSelectOption value="">カテゴリー</NativeSelectOption>
-            {(type === "event" ? eventOptions : categoryOptions).map((x) => (
+            {(type === "event" ? eventOptions.filter((option) => option !== "大会") : categoryOptions).map((x) => (
               <NativeSelectOption key={x}>{x}</NativeSelectOption>
             ))}
           </NativeSelect>
@@ -784,7 +822,7 @@ function ListScreen({
       <p className="my-4 text-sm font-bold text-zinc-500">
         {loading ? "検索中…" : `${posts.length}件の募集`}
       </p>
-      <CardGrid posts={posts} loading={loading} type={type} onOpen={onOpen} onCreate={onCreate} />
+      <CardGrid posts={posts} loading={loading} type={postType} onOpen={onOpen} onCreate={onCreate} />
     </>
   );
 }
@@ -1214,13 +1252,17 @@ function ApplicationDialog({
 function CreateScreen({
   type,
   initial,
+  defaultEventCategory,
   setType,
+  setDefaultEventCategory,
   onBack,
   onCreated,
 }: {
   type: PostType | null;
   initial: Post | null;
+  defaultEventCategory: string;
   setType: (v: PostType | null) => void;
+  setDefaultEventCategory: (value: string) => void;
   onBack: () => void;
   onCreated: () => void;
 }) {
@@ -1244,7 +1286,8 @@ function CreateScreen({
     setDraftLoaded(true);
   }, [initial, type]);
   const value = (key: string) => {
-    if (!initial) return draftValues[key] ?? "";
+    if (!initial)
+      return draftValues[key] ?? (type === "event" && key === "category" ? defaultEventCategory : "");
     const values: Record<string, string | number> = {
       tournamentName: initial.secondary_title,
       title: initial.title,
@@ -1280,7 +1323,7 @@ function CreateScreen({
         </button>
         <h1 className="mt-5 text-2xl font-black">何を募集しますか？</h1>
         <p className="mt-2 text-muted-foreground">投稿したい内容を選んでください。</p>
-        <div className="mt-6 grid gap-3 md:grid-cols-3">
+        <div className="mt-6 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
           {(
             [
               {
@@ -1298,14 +1341,25 @@ function CreateScreen({
               {
                 type: "event",
                 icon: Trophy,
-                title: "大会／イベントを掲載",
-                text: "大会・交流会・体験会を告知する",
+                title: "大会を掲載",
+                text: "大会情報を告知する",
+                eventCategory: "大会",
+              },
+              {
+                type: "event",
+                icon: CalendarDays,
+                title: "イベントを掲載",
+                text: "交流会・体験会・講習会を告知する",
+                eventCategory: "交流会",
               },
             ] as const
           ).map((item) => (
             <button
-              key={item.type}
-              onClick={() => setType(item.type)}
+              key={item.title}
+              onClick={() => {
+                setDefaultEventCategory("eventCategory" in item ? item.eventCategory : "");
+                setType(item.type);
+              }}
               className="group flex items-center gap-4 rounded-xl border border-zinc-200 bg-white p-4 text-left transition hover:border-pink-300 hover:bg-pink-50/20 md:block"
             >
               <span className="grid size-11 shrink-0 place-items-center rounded-lg bg-pink-50 text-primary">
@@ -1353,6 +1407,8 @@ function CreateScreen({
   }
   if (!draftLoaded)
     return <p className="py-12 text-center text-sm text-muted-foreground">下書きを確認しています…</p>;
+  const isTournament =
+    type === "event" && (initial?.category ?? draftValues.category ?? defaultEventCategory) === "大会";
   return (
     <>
       <button
@@ -1362,7 +1418,7 @@ function CreateScreen({
         ← {initial ? "マイページへ" : "種類を選び直す"}
       </button>
       <div className="mt-5">
-        <Badge>{labels[type]}</Badge>
+        <Badge>{isTournament ? "大会" : labels[type]}</Badge>
         <h1 className="mt-3 text-2xl font-black">{initial ? "募集を編集" : "募集内容を入力"}</h1>
         {!initial && (
           <p className="mt-2 text-sm text-muted-foreground">
@@ -1385,7 +1441,7 @@ function CreateScreen({
           />
         )}
         <Field
-          label={type === "event" ? "イベント名" : "募集タイトル"}
+          label={type === "event" ? (isTournament ? "大会名" : "イベント名") : "募集タイトル"}
           name="title"
           placeholder={
             type === "practice" ? "例：土曜の朝活ピックルボール" : "わかりやすいタイトル"
