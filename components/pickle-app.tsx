@@ -657,13 +657,6 @@ function HomeScreen({
         <div className="mt-4 max-w-xl">
           <SearchBox q={q} setQ={setQ} onSearch={onSearch} />
         </div>
-        <a
-          href="/game-scheduler"
-          className="mt-4 flex min-h-12 items-center justify-between border-y border-zinc-200 py-3 text-left text-sm font-bold text-zinc-700 hover:text-primary"
-        >
-          <span><span className="mr-2 text-primary">当日運営</span>公平なゲーム進行表を作る</span>
-          <ChevronRight className="size-4" />
-        </a>
       </section>
 
       {developmentSamplePosts.some((sample) => posts.some((post) => post.id === sample.id)) && (
