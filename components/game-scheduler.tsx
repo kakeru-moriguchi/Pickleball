@@ -2,7 +2,18 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { ArrowRight, ChevronLeft, RotateCcw, UsersRound } from "lucide-react";
+import {
+  ArrowRight,
+  CalendarDays,
+  CirclePlus,
+  Dumbbell,
+  Home,
+  RotateCcw,
+  Shuffle,
+  Trophy,
+  UserRound,
+  UsersRound,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -25,6 +36,15 @@ type Session = {
 
 type View = "progress" | "schedule" | "stats";
 const STORAGE_KEY = "pickle-link-game-scheduler-v2";
+const schedulerNav = [
+  { href: "/?screen=home", label: "ホーム", icon: Home },
+  { href: "/?screen=practice", label: "練習会", icon: Dumbbell },
+  { href: "/?screen=member", label: "メンバー", icon: UsersRound },
+  { href: "/?screen=tournament", label: "大会", icon: Trophy },
+  { href: "/?screen=event", label: "イベント", icon: CalendarDays },
+  { href: "/game-scheduler", label: "乱数表", icon: Shuffle, active: true },
+  { href: "/?screen=mypage", label: "マイページ", icon: UserRound },
+];
 
 function loadSession(): Session | null {
   try {
@@ -181,18 +201,33 @@ export function GameScheduler() {
   if (!loaded) return <main className="min-h-screen bg-[#fbfaf8]" />;
 
   return (
-    <div className="min-h-screen bg-[#fbfaf8] pb-28 text-zinc-900">
-      <header className="sticky top-0 z-30 border-b border-zinc-200 bg-[#fbfaf8]/95 px-4 backdrop-blur-md">
-        <div className="mx-auto flex h-15 max-w-4xl items-center justify-between">
-          <Link href="/" className="inline-flex min-h-11 items-center gap-1 text-sm font-bold text-zinc-600">
-            <ChevronLeft className="size-4" /> ホーム
+    <div className="min-h-screen bg-[#fbfaf8] pb-40 text-zinc-900 md:pb-28">
+      <header className="sticky top-0 z-30 border-b border-zinc-200 bg-[#fbfaf8]/95 px-4 backdrop-blur-md md:px-8">
+        <div className="mx-auto flex h-16 max-w-5xl items-center justify-between gap-6">
+          <Link href="/" className="shrink-0" aria-label="ホームへ">
+            <span className="text-lg font-extrabold tracking-tight">みんなでピックル！！</span>
           </Link>
-          <strong className="text-base">ゲーム進行</strong>
-          {session ? (
-            <button onClick={reset} className="inline-flex min-h-11 items-center gap-1 text-xs font-bold text-zinc-500">
-              <RotateCcw className="size-4" /> 最初から
-            </button>
-          ) : <span className="w-18" />}
+          <nav className="hidden flex-1 items-center justify-center gap-1 md:flex" aria-label="メインナビゲーション">
+            {schedulerNav.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`border-b-2 px-3 py-5 text-sm font-bold transition ${
+                  item.active
+                    ? "border-primary text-primary"
+                    : "border-transparent text-zinc-500 hover:text-zinc-900"
+                }`}
+              >
+                {item.label}
+              </Link>
+            ))}
+          </nav>
+          <Link
+            href="/?compose=new"
+            className="hidden h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-bold text-white md:flex"
+          >
+            <CirclePlus className="size-4" /> 募集する
+          </Link>
         </div>
       </header>
 
@@ -208,6 +243,12 @@ export function GameScheduler() {
         />
       ) : (
         <main className="mx-auto max-w-4xl px-4 py-5">
+          <div className="mb-4 flex items-center justify-between">
+            <h1 className="text-xl font-black">ゲーム進行</h1>
+            <button onClick={reset} className="inline-flex min-h-11 items-center gap-1 text-xs font-bold text-zinc-500">
+              <RotateCcw className="size-4" /> 最初から
+            </button>
+          </div>
           <div className="flex border-b border-zinc-300" role="tablist" aria-label="ゲーム進行表示">
             {([
               ["progress", "現在・次"],
@@ -244,8 +285,27 @@ export function GameScheduler() {
         </main>
       )}
 
+      <nav
+        aria-label="メインナビゲーション"
+        className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-7 border-t border-zinc-200 bg-white/97 px-0.5 pb-[max(.45rem,env(safe-area-inset-bottom))] pt-1.5 backdrop-blur-md md:hidden"
+      >
+        {schedulerNav.map(({ href, label, icon: Icon, active }) => (
+          <Link
+            key={href}
+            href={href}
+            className={`relative flex min-h-13 flex-col items-center justify-center gap-1 text-[9px] font-bold transition ${
+              active ? "text-primary" : "text-zinc-500"
+            }`}
+          >
+            {active && <span className="absolute top-0 h-0.5 w-8 rounded-full bg-primary" />}
+            <Icon className="size-[18px]" strokeWidth={active ? 2.5 : 2} />
+            <span>{label}</span>
+          </Link>
+        ))}
+      </nav>
+
       {session && view === "progress" && (
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-zinc-200 bg-white/97 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur-md">
+        <div className="fixed inset-x-0 bottom-[4.1rem] z-40 border-t border-zinc-200 bg-white/97 px-4 pb-3 pt-3 backdrop-blur-md md:bottom-0 md:pb-[max(1rem,env(safe-area-inset-bottom))]">
           <div className="mx-auto max-w-4xl">
             <Button
               onClick={() => {

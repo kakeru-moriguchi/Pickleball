@@ -250,12 +250,30 @@ export function PickleApp() {
     if (saved && prefectures.includes(saved)) setCurrentRegion(saved);
   }, []);
   useEffect(() => {
-    const compose = new URLSearchParams(window.location.search).get("compose");
+    const params = new URLSearchParams(window.location.search);
+    const compose = params.get("compose");
     if (compose === "practice" || compose === "member" || compose === "event" || compose === "tournament") {
       setCreateType(compose === "tournament" ? "event" : compose);
       setCreateEventCategory(compose === "tournament" ? "大会" : compose === "event" ? "イベント" : "");
       setEditing(null);
       setScreen("create");
+      window.history.replaceState({}, "", "/");
+      return;
+    }
+    if (compose === "new") {
+      setCreateType(null);
+      setCreateEventCategory("");
+      setEditing(null);
+      setScreen("create");
+      window.history.replaceState({}, "", "/");
+      return;
+    }
+    const linkedScreen = params.get("screen");
+    if (
+      linkedScreen === "home" || linkedScreen === "practice" || linkedScreen === "member" ||
+      linkedScreen === "tournament" || linkedScreen === "event" || linkedScreen === "mypage"
+    ) {
+      setScreen(linkedScreen);
       window.history.replaceState({}, "", "/");
     }
   }, []);
