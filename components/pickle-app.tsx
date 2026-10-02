@@ -687,16 +687,17 @@ function HomeScreen({
   onRegionChange: (region: string) => void;
 }) {
   const regionalPosts = posts.filter((post) => post.prefecture === region);
-  const groups = [
-    { screen: "practice" as ListScreenType, postType: "practice" as PostType, title: "今週参加できる練習会", link: "練習会をもっと見る" },
-    { screen: "member" as ListScreenType, postType: "member" as PostType, title: "大会メンバーを探している人", link: "メンバー募集を見る" },
-    { screen: "tournament" as ListScreenType, postType: "event" as PostType, title: "近くの大会", link: "大会一覧を見る" },
-    { screen: "event" as ListScreenType, postType: "event" as PostType, title: "近くのイベント", link: "イベント一覧を見る" },
-  ];
+  const practicePosts = regionalPosts.filter((post) => matchesListScreen(post, "practice")).slice(0, 3);
+  const memberPosts = regionalPosts.filter((post) => matchesListScreen(post, "member")).slice(0, 2);
+  const tournamentPosts = regionalPosts.filter((post) => matchesListScreen(post, "tournament")).slice(0, 3);
+  const eventPosts = regionalPosts.filter((post) => matchesListScreen(post, "event")).slice(0, 3);
+  const latestPosts = [...regionalPosts]
+    .sort((a, b) => b.created_at.localeCompare(a.created_at))
+    .slice(0, 5);
   return (
     <>
-      <section className="border-b border-zinc-200 pb-5">
-        <label className="inline-flex items-center gap-1.5 text-sm font-bold text-zinc-600">
+      <section className="border-b border-zinc-300 pb-5">
+        <label className="inline-flex min-h-9 items-center gap-1.5 text-sm font-bold text-zinc-600">
           <MapPinned className="size-4 text-primary" />
           <NativeSelect
             aria-label="現在の地域"
@@ -716,7 +717,7 @@ function HomeScreen({
         <p className="mt-1.5 text-sm leading-6 text-zinc-600">
           近くの練習会と、一緒にプレーする仲間が見つかります。
         </p>
-        <div className="mt-4 grid grid-cols-2 gap-2 sm:max-w-md">
+        <div className="mt-4 flex gap-2 sm:max-w-md">
           <Button onClick={() => onMore("practice")} className="h-10 rounded-lg font-bold">
             練習会を探す
           </Button>
@@ -735,41 +736,217 @@ function HomeScreen({
         </p>
       )}
 
-      {groups.map((group, index) => (
-        <section key={group.screen} className={index === 0 ? "mt-6" : "mt-9"}>
-          <div className="mb-3 flex items-end justify-between gap-4">
-            <h2 className="text-lg font-black tracking-tight md:text-xl">{group.title}</h2>
-            <button onClick={() => onMore(group.screen)} className="shrink-0 text-xs font-bold text-primary">
-              {group.link} <span aria-hidden>›</span>
-            </button>
-          </div>
-          <CardGrid
-            posts={regionalPosts.filter((post) => matchesListScreen(post, group.screen)).slice(0, 3)}
-            loading={loading}
-            type={group.postType}
-            onOpen={onOpen}
-            onCreate={() =>
-              onCreate(
-                group.postType,
-                group.screen === "tournament" ? "大会" : group.screen === "event" ? "交流会" : "",
-              )
-            }
-          />
-        </section>
-      ))}
-      <section className="mt-9 border-t border-zinc-200 pt-7">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-lg font-black">新着の募集</h2>
-        </div>
-        <CardGrid
-          posts={[...regionalPosts].sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 3)}
+      <section className="mt-6">
+        <HomeSectionHeading
+          eyebrow="まずは日程から"
+          title="近日参加できる練習会"
+          action="練習会をもっと見る"
+          onMore={() => onMore("practice")}
+        />
+        <HomePracticeList
+          posts={practicePosts}
           loading={loading}
-          type="practice"
           onOpen={onOpen}
           onCreate={() => onCreate("practice")}
         />
       </section>
+
+      <section className="mt-10">
+        <HomeSectionHeading
+          eyebrow="一緒に出る人を探す"
+          title="大会メンバーを探している人"
+          action="メンバー募集を見る"
+          onMore={() => onMore("member")}
+        />
+        <HomeMemberList
+          posts={memberPosts}
+          loading={loading}
+          onOpen={onOpen}
+          onCreate={() => onCreate("member")}
+        />
+      </section>
+
+      <div className="-mx-4 mt-10 bg-[#f3f0eb] px-4 py-7 md:mx-0 md:px-6">
+        <section>
+          <HomeSectionHeading
+            eyebrow="エントリー情報"
+            title="近くで開催される大会"
+            action="大会一覧を見る"
+            onMore={() => onMore("tournament")}
+          />
+          <HomeDateList
+            posts={tournamentPosts}
+            loading={loading}
+            kind="tournament"
+            onOpen={onOpen}
+            onCreate={() => onCreate("event", "大会")}
+          />
+        </section>
+
+        <section className="mt-9 border-t border-zinc-300 pt-7">
+          <HomeSectionHeading
+            eyebrow="交流・体験・講習"
+            title="近くのイベント"
+            action="イベント一覧を見る"
+            onMore={() => onMore("event")}
+          />
+          <HomeDateList
+            posts={eventPosts}
+            loading={loading}
+            kind="event"
+            onOpen={onOpen}
+            onCreate={() => onCreate("event", "イベント")}
+          />
+        </section>
+      </div>
+
+      <section className="mt-9 border-t border-zinc-300 pt-7">
+        <HomeSectionHeading
+          eyebrow="更新順"
+          title="新着の募集"
+          action=""
+          onMore={() => {}}
+        />
+        <HomeLatestList posts={latestPosts} loading={loading} onOpen={onOpen} />
+      </section>
     </>
+  );
+}
+
+function HomeSectionHeading({
+  eyebrow,
+  title,
+  action,
+  onMore,
+}: {
+  eyebrow: string;
+  title: string;
+  action: string;
+  onMore: () => void;
+}) {
+  return (
+    <div className="mb-3 flex items-end justify-between gap-4">
+      <div>
+        <p className="text-[11px] font-bold tracking-wide text-primary">{eyebrow}</p>
+        <h2 className="mt-0.5 text-lg font-black tracking-tight md:text-xl">{title}</h2>
+      </div>
+      {action && (
+        <button onClick={onMore} className="shrink-0 pb-0.5 text-xs font-bold text-primary">
+          {action} <span aria-hidden>›</span>
+        </button>
+      )}
+    </div>
+  );
+}
+
+function HomeLoadingRows() {
+  return (
+    <div className="divide-y divide-zinc-200 border-y border-zinc-200 bg-white">
+      {[0, 1].map((item) => <div key={item} className="h-24 animate-pulse bg-zinc-50" />)}
+    </div>
+  );
+}
+
+function HomeEmptyLine({ text, action, onCreate }: { text: string; action: string; onCreate: () => void }) {
+  return (
+    <div className="flex min-h-20 items-center justify-between gap-4 border-y border-zinc-200 py-4 text-sm">
+      <span className="text-zinc-500">{text}</span>
+      <button onClick={onCreate} className="shrink-0 font-bold text-primary">{action} ›</button>
+    </div>
+  );
+}
+
+function HomePracticeList({ posts, loading, onOpen, onCreate }: { posts: Post[]; loading: boolean; onOpen: (post: Post) => void; onCreate: () => void }) {
+  if (loading) return <HomeLoadingRows />;
+  if (!posts.length) return <HomeEmptyLine text="近日の練習会はまだありません" action="募集を作る" onCreate={onCreate} />;
+  return (
+    <div className="divide-y divide-zinc-200 border-y border-zinc-300 bg-white">
+      {posts.map((post) => {
+        const date = new Date(`${post.held_on}T00:00:00`);
+        const full = post.status === "closed" || remaining(post) === 0;
+        return (
+          <button key={post.id} onClick={() => onOpen(post)} className="group flex w-full gap-4 py-4 text-left">
+            <div className="w-12 shrink-0 border-r border-zinc-200 pr-3 text-center">
+              <span className="block text-[10px] font-bold text-zinc-500">{date.getMonth() + 1}月</span>
+              <strong className="block text-2xl leading-none text-zinc-900">{date.getDate()}</strong>
+              <span className="mt-1 block text-[10px] text-zinc-500">{["日", "月", "火", "水", "木", "金", "土"][date.getDay()]}</span>
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-start justify-between gap-2">
+                <h3 className="font-black leading-snug text-zinc-900">{post.title}</h3>
+                <span className={`shrink-0 text-xs font-black ${full ? "text-zinc-400" : "text-primary"}`}>
+                  {full ? "満員・終了" : `あと${remaining(post)}名`}
+                </span>
+              </div>
+              <p className="mt-1 text-sm font-semibold text-zinc-700">{formatTime(post.start_time)}〜{formatTime(post.end_time)}　{post.venue}</p>
+              <p className="mt-2 text-xs text-zinc-500">{formatLevels(post.level)}　主催：{post.organizer}さん</p>
+            </div>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function HomeMemberList({ posts, loading, onOpen, onCreate }: { posts: Post[]; loading: boolean; onOpen: (post: Post) => void; onCreate: () => void }) {
+  if (loading) return <HomeLoadingRows />;
+  if (!posts.length) return <HomeEmptyLine text="メンバー募集はまだありません" action="仲間を募集する" onCreate={onCreate} />;
+  return (
+    <div className="grid gap-4 md:grid-cols-2">
+      {posts.map((post) => (
+        <button key={post.id} onClick={() => onOpen(post)} className="border-l-4 border-[#d86d75] bg-white py-3 pl-4 pr-2 text-left">
+          <div className="flex items-center gap-2">
+            <span className="grid size-9 shrink-0 place-items-center rounded-full bg-[#f1e3df] font-black text-[#9d4d54]">{post.organizer.slice(0, 1)}</span>
+            <div className="min-w-0">
+              <p className="font-bold text-zinc-900">{post.organizer}さん</p>
+              <p className="truncate text-xs text-zinc-500">{post.secondary_title}・{formatDate(post.held_on)}</p>
+            </div>
+          </div>
+          <p className="mt-3 font-bold leading-6 text-zinc-800">「{post.title}」</p>
+          <p className="mt-2 text-xs font-semibold text-zinc-500">{post.category}　{formatLevels(post.level)}　{post.venue}</p>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function HomeDateList({ posts, loading, kind, onOpen, onCreate }: { posts: Post[]; loading: boolean; kind: "tournament" | "event"; onOpen: (post: Post) => void; onCreate: () => void }) {
+  if (loading) return <HomeLoadingRows />;
+  if (!posts.length)
+    return <HomeEmptyLine text={kind === "tournament" ? "掲載中の大会はまだありません" : "掲載中のイベントはまだありません"} action={kind === "tournament" ? "大会を掲載する" : "イベントを掲載する"} onCreate={onCreate} />;
+  return (
+    <div className="divide-y divide-zinc-300 border-y border-zinc-300">
+      {posts.map((post) => (
+        <button key={post.id} onClick={() => onOpen(post)} className="flex w-full items-center gap-4 py-4 text-left">
+          <time className="w-14 shrink-0 text-center">
+            <span className="block text-[10px] font-bold text-primary">{post.held_on.slice(5, 7)}月</span>
+            <strong className="block text-2xl leading-none">{Number(post.held_on.slice(8, 10))}</strong>
+          </time>
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] font-bold text-primary">{kind === "tournament" ? post.competition_format || "大会" : "イベント"}</p>
+            <h3 className="truncate font-black text-zinc-900">{post.title}</h3>
+            <p className="mt-1 truncate text-xs text-zinc-500">{post.venue}　主催：{post.organizer}</p>
+          </div>
+          <ChevronRight className="size-4 shrink-0 text-zinc-400" />
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function HomeLatestList({ posts, loading, onOpen }: { posts: Post[]; loading: boolean; onOpen: (post: Post) => void }) {
+  if (loading) return <HomeLoadingRows />;
+  if (!posts.length) return <p className="border-y border-zinc-200 py-5 text-sm text-zinc-500">新着の募集はまだありません。</p>;
+  return (
+    <div className="divide-y divide-zinc-200 border-y border-zinc-300">
+      {posts.map((post) => (
+        <button key={`${post.type}:${post.id}`} onClick={() => onOpen(post)} className="flex min-h-14 w-full items-center gap-3 py-3 text-left">
+          <span className="w-16 shrink-0 text-[11px] font-black text-primary">{post.category === "大会" ? "大会" : labels[post.type]}</span>
+          <span className="min-w-0 flex-1 truncate text-sm font-bold text-zinc-800">{post.title}</span>
+          <time className="shrink-0 text-xs text-zinc-500">{formatDate(post.held_on).split(" ")[0]}</time>
+        </button>
+      ))}
+    </div>
   );
 }
 
