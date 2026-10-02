@@ -84,7 +84,6 @@ const labels: Record<PostType, string> = {
   event: "イベント",
 };
 const categoryOptions = ["男子ダブルス", "女子ダブルス", "ミックスダブルス", "団体戦", "その他"];
-const eventOptions = ["大会", "交流会", "練習会", "体験会", "講習会", "その他"];
 const competitionFormatOptions = ["団体戦", "個人戦"];
 const levelOptions = ["初心者歓迎", "初級", "中級", "上級", "レベル不問"];
 const timeOptions = Array.from({ length: 48 }, (_, index) => {
@@ -827,14 +826,14 @@ function ListScreen({
             ))}
           </NativeSelect>
         )}
-        {type !== "practice" && type !== "tournament" && (
+        {type === "member" && (
           <NativeSelect
             value={filters.category}
             onChange={(e) => setFilters({ ...filters, category: e.target.value })}
             className="min-w-32"
           >
             <NativeSelectOption value="">カテゴリー</NativeSelectOption>
-            {(type === "event" ? eventOptions.filter((option) => option !== "大会") : categoryOptions).map((x) => (
+            {categoryOptions.map((x) => (
               <NativeSelectOption key={x}>{x}</NativeSelectOption>
             ))}
           </NativeSelect>
@@ -1460,6 +1459,7 @@ function CreateScreen({
     return <p className="py-12 text-center text-sm text-muted-foreground">下書きを確認しています…</p>;
   const isTournament =
     type === "event" && (initial?.category ?? draftValues.category ?? defaultEventCategory) === "大会";
+  const isGeneralEvent = type === "event" && !isTournament;
   const tournamentUnit = competitionFormat === "団体戦" ? "チーム" : "ペア";
   return (
     <>
@@ -1502,7 +1502,7 @@ function CreateScreen({
         />
         {(type === "member" || type === "event") && (
           <Field
-            label="大会・イベント情報URL（任意）"
+            label={type === "member" || isTournament ? "大会情報URL（任意）" : "イベント情報URL（任意）"}
             name="informationUrl"
             type="url"
             placeholder="https://example.com/event"
@@ -1550,38 +1550,39 @@ function CreateScreen({
             />
           </>
         )}
-        <div className="grid gap-4 md:grid-cols-2">
-          <Field
-            label={
-              isTournament
-                ? `募集${tournamentUnit}数`
-                : type === "member"
-                  ? "募集人数"
-                  : "定員"
-            }
-            name="capacity"
-            type="number"
-            placeholder="8"
-            defaultValue={value("capacity")}
-          />
-          {type !== "member" && (
+        {isGeneralEvent && (
+          <>
+            <input type="hidden" name="category" value="イベント" />
+            <input type="hidden" name="level" value="レベル不問" />
+          </>
+        )}
+        {!isGeneralEvent && (
+          <div className="grid gap-4 md:grid-cols-2">
             <Field
-              label={isTournament ? `参加費（円／1${tournamentUnit}）` : "参加費（円）"}
-              name="fee"
+              label={
+                isTournament
+                  ? `募集${tournamentUnit}数`
+                  : type === "member"
+                    ? "募集人数"
+                    : "定員"
+              }
+              name="capacity"
               type="number"
-              placeholder="0"
-              defaultValue={value("fee")}
+              placeholder="8"
+              defaultValue={value("capacity")}
             />
-          )}
-        </div>
-        {type === "event" && !isTournament ? (
-          <SelectField
-            label="イベント種類"
-            name="category"
-            options={eventOptions.filter((option) => option !== "大会")}
-            defaultValue={value("category")}
-          />
-        ) : type === "member" ? (
+            {type !== "member" && (
+              <Field
+                label={isTournament ? `参加費（円／1${tournamentUnit}）` : "参加費（円）"}
+                name="fee"
+                type="number"
+                placeholder="0"
+                defaultValue={value("fee")}
+              />
+            )}
+          </div>
+        )}
+        {type === "member" ? (
           <>
             <SelectField
               label="カテゴリー"
@@ -1596,14 +1597,14 @@ function CreateScreen({
               defaultValue={value("level")}
             />
           </>
-        ) : (
+        ) : !isGeneralEvent ? (
           <MultiLevelField
             label="対象レベル"
             name="level"
             options={levelOptions}
             defaultValue={value("level")}
           />
-        )}
+        ) : null}
         <label className="block">
           <span className="mb-2 block text-sm font-bold">募集内容</span>
           <Textarea
@@ -1615,6 +1616,24 @@ function CreateScreen({
             defaultValue={value("description")}
           />
         </label>
+        {isGeneralEvent && (
+          <div className="grid gap-4 md:grid-cols-2">
+            <Field
+              label="募集人数"
+              name="capacity"
+              type="number"
+              placeholder="8"
+              defaultValue={value("capacity")}
+            />
+            <Field
+              label="参加費（円）"
+              name="fee"
+              type="number"
+              placeholder="0"
+              defaultValue={value("fee")}
+            />
+          </div>
+        )}
         <Field
           label={type === "practice" ? "主催者名" : type === "member" ? "投稿者名" : "主催者"}
           name="organizer"
