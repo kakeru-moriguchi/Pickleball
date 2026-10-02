@@ -5,6 +5,16 @@ import { getGuestId } from "@/lib/guest";
 
 type Raw = Record<string, unknown>;
 type ViewerParticipation = { status: string; id: string; unread: number; blocked: boolean; blockedByMe: boolean };
+const allowedLevels = ["初心者歓迎", "初級", "中級", "上級", "レベル不問"];
+
+function targetLevels(body: Record<string, unknown>) {
+  const levels = [...new Set(required(body, "level").split(",").map((value) => value.trim()).filter(Boolean))];
+  if (!levels.length || levels.some((level) => !allowedLevels.includes(level)))
+    throw new Error("対象レベルが正しくありません");
+  if (levels.includes("レベル不問") && levels.length > 1)
+    throw new Error("レベル不問は他のレベルと同時に選択できません");
+  return levels.join(",");
+}
 
 function todayInJapan() {
   const parts = new Intl.DateTimeFormat("en", {
@@ -40,7 +50,7 @@ function mapPost(
     prefecture: row.prefecture,
     capacity: row.capacity,
     fee: type === "member" ? 0 : row.fee,
-    level: type === "event" ? "" : row.level,
+    level: type === "event" ? String(row.level ?? "レベル不問") : String(row.level ?? ""),
     category: type === "practice" ? "" : type === "member" ? row.category : row.event_type,
     competition_format: type === "event" ? String(row.competition_format ?? "") : "",
     description: row.description,
@@ -124,10 +134,12 @@ export async function GET(request: NextRequest) {
           String(v).toLowerCase().includes(q),
         ),
       );
-    for (const key of ["prefecture", "level", "category"] as const) {
+    for (const key of ["prefecture", "category"] as const) {
       const value = p.get(key);
       if (value) posts = posts.filter((x) => x[key] === value);
     }
+    const level = p.get("level");
+    if (level) posts = posts.filter((x) => String(x.level).split(",").includes(level));
     const date = p.get("date");
     if (date) posts = posts.filter((x) => x.held_on === date);
     if (scope === "mine") {
@@ -163,7 +175,7 @@ function values(type: PostType, body: Record<string, unknown>, userId: string) {
       prefecture: required(body, "prefecture"),
       capacity: count(body, "capacity"),
       fee: count(body, "fee", true),
-      level: required(body, "level"),
+      level: targetLevels(body),
       description: required(body, "description"),
       organizer_name: required(body, "organizer"),
     };
@@ -198,6 +210,7 @@ function values(type: PostType, body: Record<string, unknown>, userId: string) {
     prefecture: required(body, "prefecture"),
     fee: count(body, "fee", true),
     capacity: count(body, "capacity"),
+    level: targetLevels(body),
     description: required(body, "description"),
     organizer: required(body, "organizer"),
     application_method: required(body, "applicationMethod"),

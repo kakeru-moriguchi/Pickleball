@@ -140,6 +140,26 @@ function remaining(post: Post) {
   return Math.max(0, post.capacity - post.participant_count);
 }
 
+function splitLevels(value: string) {
+  return value.split(",").map((level) => level.trim()).filter(Boolean);
+}
+
+function formatLevels(value: string) {
+  return splitLevels(value).join("・") || "レベル不問";
+}
+
+function postFormValues(form: HTMLFormElement) {
+  const data = new FormData(form);
+  if (form.querySelector("[data-level-multi]")) {
+    const levels = data.getAll("levelChoice").map(String);
+    data.set("level", levels.includes("レベル不問") ? "レベル不問" : levels.join(","));
+    data.delete("levelChoice");
+  }
+  return Object.fromEntries(
+    Array.from(data.entries()).map(([key, entry]) => [key, String(entry)]),
+  );
+}
+
 function filterDevelopmentPosts(
   screen: Screen,
   q: string,
@@ -156,7 +176,7 @@ function filterDevelopmentPosts(
       return false;
     if (filters.prefecture && post.prefecture !== filters.prefecture) return false;
     if (filters.date && post.held_on !== filters.date) return false;
-    if (filters.level && post.level !== filters.level) return false;
+    if (filters.level && !splitLevels(post.level).includes(filters.level)) return false;
     if (filters.category && post.category !== filters.category) return false;
     return true;
   });
@@ -900,7 +920,7 @@ function PracticePostCard({ post, onOpen }: { post: Post; onOpen: (p: Post) => v
           {post.venue}
         </p>
         <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-          <span className="rounded-md bg-zinc-100 px-2 py-1 font-semibold text-zinc-700">{post.level || "レベル不問"}</span>
+          <span className="rounded-md bg-zinc-100 px-2 py-1 font-semibold text-zinc-700">{formatLevels(post.level)}</span>
           <span className={`font-black ${full ? "text-zinc-500" : "text-primary"}`}>
             {full ? "満員・終了" : `あと${remaining(post)}名`}
           </span>
@@ -967,6 +987,7 @@ function EventPostCard({ post, onOpen }: { post: Post; onOpen: (p: Post) => void
         <h3 className="mt-1 line-clamp-2 font-black leading-snug text-zinc-900">{post.title}</h3>
         <p className="mt-2 text-sm text-zinc-600">{formatTime(post.start_time)}〜{formatTime(post.end_time)}</p>
         <p className="mt-1 truncate text-sm text-zinc-500">{post.venue}</p>
+        <p className="mt-2 text-xs font-semibold text-zinc-600">対象：{formatLevels(post.level)}</p>
         <p className="mt-2 text-xs text-zinc-400">主催：{post.organizer}</p>
       </div>
     </button>
@@ -1037,6 +1058,7 @@ function DetailDialog({
           <p className="col-span-2 border-t border-zinc-200 pt-3 font-bold">
             {isTournament ? `募集${tournamentUnit}数` : "定員"}：{post.capacity}{capacityUnit}
           </p>
+          <p className="col-span-2 font-bold">対象レベル：{formatLevels(post.level)}</p>
         </div>
         <div>
           <h4 className="font-black">募集内容</h4>
@@ -1341,9 +1363,7 @@ function CreateScreen({
   };
   const saveDraft = (form: HTMLFormElement) => {
     if (initial || !type) return;
-    const values = Object.fromEntries(
-      Array.from(new FormData(form).entries()).map(([key, entry]) => [key, String(entry)]),
-    );
+    const values = postFormValues(form);
     window.localStorage.setItem(POST_DRAFT_KEY, JSON.stringify({ type, values } satisfies PostDraft));
   };
   if (!type)
@@ -1411,7 +1431,7 @@ function CreateScreen({
     saveDraft(event.currentTarget);
     setSaving(true);
     setError("");
-    const body = Object.fromEntries(new FormData(event.currentTarget));
+    const body = postFormValues(event.currentTarget);
     try {
       const response = await fetch("/api/posts", {
         method: initial ? "PATCH" : "POST",
@@ -1577,7 +1597,7 @@ function CreateScreen({
             />
           </>
         ) : (
-          <SelectField
+          <MultiLevelField
             label="対象レベル"
             name="level"
             options={levelOptions}
@@ -1718,6 +1738,66 @@ function SelectField({
         ))}
       </NativeSelect>
     </label>
+  );
+}
+
+function MultiLevelField({
+  label,
+  name,
+  options,
+  defaultValue,
+}: {
+  label: string;
+  name: string;
+  options: string[];
+  defaultValue?: string | number;
+}) {
+  const initialValue = String(defaultValue ?? "");
+  const [selected, setSelected] = useState<string[]>(() => splitLevels(initialValue));
+
+  useEffect(() => {
+    setSelected(splitLevels(initialValue));
+  }, [initialValue]);
+
+  return (
+    <fieldset data-level-multi className="block">
+      <legend className="text-sm font-bold">{label}（複数選択可）</legend>
+      <input type="hidden" name={name} value={selected.join(",")} />
+      <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+        {options.map((option) => {
+          const checked = selected.includes(option);
+          return (
+            <label
+              key={option}
+              className={`flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold transition ${
+                checked
+                  ? "border-primary bg-pink-50 text-zinc-900"
+                  : "border-zinc-200 bg-white text-zinc-600 hover:border-pink-300"
+              }`}
+            >
+              <input
+                type="checkbox"
+                name="levelChoice"
+                value={option}
+                checked={checked}
+                onChange={(event) => {
+                  setSelected((current) => {
+                    if (event.target.checked) {
+                      if (option === "レベル不問") return [option];
+                      return [...current.filter((level) => level !== "レベル不問"), option];
+                    }
+                    return current.filter((level) => level !== option);
+                  });
+                }}
+                className="size-4 accent-[var(--primary)]"
+              />
+              {option}
+            </label>
+          );
+        })}
+      </div>
+      <p className="mt-2 text-xs text-muted-foreground">対象にしたいレベルを1つ以上選んでください。</p>
+    </fieldset>
   );
 }
 
