@@ -100,8 +100,13 @@ const prefectures = [
   "福岡県", "佐賀県", "長崎県", "熊本県", "大分県", "宮崎県", "鹿児島県", "沖縄県",
 ];
 
-const POST_DRAFT_KEY = "pickle-link-post-draft-v1";
+const POST_DRAFT_KEY = "pickle-link-post-draft-v2";
 type PostDraft = { type: PostType; values: Record<string, string> };
+
+function postDraftKey(type: PostType, eventCategory = "") {
+  const kind = type === "event" ? (eventCategory === "大会" ? "tournament" : "event") : type;
+  return `${POST_DRAFT_KEY}:${kind}`;
+}
 
 const nav = [
   { screen: "home" as Screen, label: "ホーム", icon: Home },
@@ -246,8 +251,9 @@ export function PickleApp() {
   }, []);
   useEffect(() => {
     const compose = new URLSearchParams(window.location.search).get("compose");
-    if (compose === "practice" || compose === "member" || compose === "event") {
-      setCreateType(compose);
+    if (compose === "practice" || compose === "member" || compose === "event" || compose === "tournament") {
+      setCreateType(compose === "tournament" ? "event" : compose);
+      setCreateEventCategory(compose === "tournament" ? "大会" : compose === "event" ? "イベント" : "");
       setEditing(null);
       setScreen("create");
       window.history.replaceState({}, "", "/");
@@ -323,6 +329,7 @@ export function PickleApp() {
               const type = (input as { type?: PostType })?.type;
               if (!type || !labels[type]) throw new Error("募集種別が正しくありません");
               setCreateType(type);
+              setCreateEventCategory(type === "event" ? "イベント" : "");
               setScreen("create");
               return { started: true, type };
             },
@@ -1319,14 +1326,14 @@ function CreateScreen({
       return;
     }
     try {
-      const saved = window.localStorage.getItem(POST_DRAFT_KEY);
+      const saved = window.localStorage.getItem(postDraftKey(type, defaultEventCategory));
       const draft = saved ? (JSON.parse(saved) as PostDraft) : null;
       setDraftValues(draft?.type === type ? draft.values : {});
     } catch {
       setDraftValues({});
     }
     setDraftLoaded(true);
-  }, [initial, type]);
+  }, [defaultEventCategory, initial, type]);
   useEffect(() => {
     if (!draftLoaded || type !== "event") return;
     const category = initial?.category ?? draftValues.category ?? defaultEventCategory;
@@ -1363,7 +1370,10 @@ function CreateScreen({
   const saveDraft = (form: HTMLFormElement) => {
     if (initial || !type) return;
     const values = postFormValues(form);
-    window.localStorage.setItem(POST_DRAFT_KEY, JSON.stringify({ type, values } satisfies PostDraft));
+    window.localStorage.setItem(
+      postDraftKey(type, values.category || defaultEventCategory),
+      JSON.stringify({ type, values } satisfies PostDraft),
+    );
   };
   if (!type)
     return (
@@ -1427,6 +1437,8 @@ function CreateScreen({
     );
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!type) return;
+    const postType = type;
     saveDraft(event.currentTarget);
     setSaving(true);
     setError("");
@@ -1437,17 +1449,19 @@ function CreateScreen({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...body,
-          type,
+          type: postType,
           id: initial?.id,
           action: initial ? "edit" : undefined,
         }),
       });
       if (response.status === 401 && !initial) {
-        window.location.assign(`/login?next=${encodeURIComponent(`/?compose=${type}`)}`);
+        const compose = isTournament ? "tournament" : postType;
+        window.location.assign(`/login?next=${encodeURIComponent(`/?compose=${compose}`)}`);
         return;
       }
       await readJson(response);
-      if (!initial) window.localStorage.removeItem(POST_DRAFT_KEY);
+      if (!initial)
+        window.localStorage.removeItem(postDraftKey(postType, isTournament ? "大会" : defaultEventCategory));
       onCreated();
     } catch (err) {
       setError(err instanceof Error ? err.message : "投稿に失敗しました");
